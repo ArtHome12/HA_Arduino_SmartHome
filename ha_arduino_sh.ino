@@ -91,7 +91,7 @@ void loop()
     results[0][sensCount] = analogRead(voltagePin) / 4.092;
 
     // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
-    results[0][sensCount] = ((analogRead(currentPin) / 1024.0 * 5000) - 2500) / mVperAmp;
+    results[1][sensCount] = ((analogRead(currentPin) / 1024.0 * 5000) - 2500) / mVperAmp;
   }
 }
 
