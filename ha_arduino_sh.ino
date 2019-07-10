@@ -87,8 +87,8 @@ void loop()
       results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
     }
 
-    // Считываем напряжение
-    results[0][sensCount] = analogRead(voltagePin) / 4.092;
+    // Считываем напряжение (max 25V)
+    results[0][sensCount] = analogRead(voltagePin) * 25.0 / 1024.0;
 
     // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
     results[1][sensCount] = ((analogRead(currentPin) / 1024.0 * 5000) - 2500) / mVperAmp;
