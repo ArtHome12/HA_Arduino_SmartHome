@@ -36,6 +36,9 @@ const float powerHiBound = 12.0;        // При росте напряжени�
 int cyclesFromPowerOff = 0;             // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 int cyclesFromPowerOffLimit = 180;      // Ставим 3 минуты, чтобы RPi успела выключиться.
 
+bool tmpRPiGPIOExperiments = false;     // УДАЛИТЬ после отладки.
+
+
 void tcaselect(uint8_t i) {
   Wire.beginTransmission(TCAADDR);
   Wire.write(1 << i);
@@ -181,5 +184,11 @@ void powerControl(float voltage){
     }
   }
   
+  // УДАЛИТЬ после отладки.
+  if (tmpRPiGPIOExperiments)
+    digitalWrite(RPiOffPin, HIGH);
+  else
+    digitalWrite(RPiOffPin, LOW);
+  tmpRPiGPIOExperiments = not tmpRPiGPIOExperiments;
 
 }
