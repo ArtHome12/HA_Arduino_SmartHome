@@ -101,7 +101,12 @@ void loop()
 
     // Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
     float voltage = analogRead(voltagePin) * 25.0 / 1024.0;
-    results[0][sensCount] = voltage;
+
+    // Усредняем с текущим напряжением, но только если это не первый запуск.
+    if (results[0][sensCount] > 0) 
+      results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
+    else 
+      results[0][sensCount] = voltage;
 
     // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
     results[1][sensCount] = ((analogRead(currentPin) * 5000.0 / 1024.0) - 2500) / mVperAmp;
@@ -152,7 +157,7 @@ void myBlink(uint8_t count) {
 }
 
 
-// Упрваляет питанием RPi.
+// Управляет питанием RPi.
 void powerControl(float voltage){
 
   // У RPi когда на пине Run высокий уровень, она работает. Когда низкий, она перегружается после его отпускания.
