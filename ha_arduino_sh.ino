@@ -51,8 +51,8 @@ void setup()
     pinMode(RPiResetPin, OUTPUT);
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
-    Wire.setClock(10000);
     Wire.begin();
+    //Wire.setClock(1);
     
     // Посылаем команду на инициализацию устройств на всех портах.
     for (uint8_t t = 0; t < sensCount; t++) {
