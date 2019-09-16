@@ -36,6 +36,9 @@ const float powerHiBound = 12.0;        // При росте напряжени�
 int cyclesFromPowerOff = 0;             // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 int cyclesFromPowerOffLimit = 180;      // Ставим 3 минуты, чтобы RPi успела выключиться.
 
+unsigned int tempVoltage[10];
+int tempVoltageIndex = 0;
+
 void tcaselect(uint8_t i) {
   Wire.beginTransmission(TCAADDR);
   Wire.write(1 << i);
@@ -76,6 +79,11 @@ void loop()
   // Условие, отдельно для защиты от перехода через 0.
   unsigned long condition = currentMillis - previousMillis;
 
+  // Значение напряжения для усреднения
+  tempVoltage[tempVoltageIndex++] = analogRead(voltagePin);
+  if (tempVoltageIndex >= 10)
+    tempVoltageIndex = 0;
+
   if (condition >= interval) {
     // save the last time.
     previousMillis = currentMillis;
@@ -100,13 +108,18 @@ void loop()
     }
 
     // Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
-    float voltage = analogRead(voltagePin) * 25.0 / 1024.0;
+    unsigned int voltageSum = tempVoltage[0];
+    for (int i = 1; i < 10; i++)
+      voltageSum += tempVoltage[i];
+
+    // float voltage = analogRead(voltagePin) * 25.0 / 1024.0;
+    float voltage = voltageSum * 2.5 / 1024.0;
 
     // Усредняем с текущим напряжением, но только если это не первый запуск.
-    if (results[0][sensCount] > 0) 
-      results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
-    else 
-      results[0][sensCount] = voltage;
+    // if (results[0][sensCount] > 0) 
+    //   results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
+    // else 
+    //   results[0][sensCount] = voltage;
 
     // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
     results[1][sensCount] = ((analogRead(currentPin) * 5000.0 / 1024.0) - 2500) / mVperAmp;
