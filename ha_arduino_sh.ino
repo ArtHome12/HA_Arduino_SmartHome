@@ -31,10 +31,11 @@ float results[2][sensCount + 1];        // 1 for temperature and 2 for humidity 
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили вручную и надо ждать повышения напряжения для её включения.
-const float powerLowBound = 11.7;       // При падении напряжения ниже этой границы RPi надо отключить.
-const float powerHiBound = 12.0;        // При росте напряжения выше этой границы RPi надо включить, если она была выключена.
-int cyclesFromPowerOff = 0;             // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
-int cyclesFromPowerOffLimit = 180;      // Ставим 3 минуты, чтобы RPi успела выключиться.
+const float powerLowBound = 11.2;       // При падении напряжения ниже этой границы RPi надо отключить.
+const float powerHiBound = 11.6;        // При росте напряжения выше этой границы RPi надо включить, если она была выключена.
+int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
+const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
+const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
 
 int rawVoltage[10];
 uint8_t rawVoltageIndex = 0;
@@ -52,6 +53,7 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(RPiOffPin, OUTPUT);
     pinMode(RPiResetPin, OUTPUT);
+    digitalWrite(RPiOffPin, LOW);
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
     Wire.begin();
@@ -67,6 +69,9 @@ void setup()
     //while (!Serial);
     Serial.begin(115200);
     myBlink(5);
+
+    // Чтобы дать время на опрос датчиков напряжения.
+    previousMillis = millis();
 }
 
 
@@ -116,17 +121,17 @@ void loop()
     float voltage = voltageSum * 2.5 / 1024.0;
 
     // Усредняем с текущим напряжением, но только если это не первый запуск.
-    // if (results[0][sensCount] > 0) 
-    //   results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
-    // else 
-    results[0][sensCount] = voltage;
+    if (results[0][sensCount] > 0) 
+      results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
+    else 
+      results[0][sensCount] = voltage;
 
     // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
     results[1][sensCount] = ((analogRead(currentPin) * 5000.0 / 1024.0) - 2500) / mVperAmp;
     //results[1][sensCount] = analogRead(currentPin);
 
     // Управляем питанием RPi. 
-    powerControl(voltage);
+    powerControl(results[0][sensCount]);
   }
 }
 
@@ -177,30 +182,36 @@ void powerControl(float voltage){
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
   // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
 
-  if (not IsRPiOff) {
-    // Если напряжение упало низко, надо послать сигнал на выключение RPi.
-    if (voltage < powerLowBound) {
-      IsRPiOff = true;
-      digitalWrite(RPiOffPin, HIGH);
-      cyclesFromPowerOff = 0;
-    }
-  } else {
+  if (IsRPiOff) {
     // Если напряжение обратно выросло (выглянуло солнце), то надо отправить ресет на RPi для её загрузки, но только если прошло 
-    // не менее 2-х минут во-избежание случайных колебаний.
+    // не менее какого-то времени во-избежание случайных колебаний.
 
     // В режиме выключения увеличиваем счётчик, если напряжение высокое.
     if (voltage > powerHiBound)
-      cyclesFromPowerOff++;
+      cyclesForPowerChange++;
     else
-      cyclesFromPowerOff = 0;
+      cyclesForPowerChange = 0;
 
     // Если напряжение выросло и счётчик достаточно отмотал, включаемся.
-    if (cyclesFromPowerOff > cyclesFromPowerOffLimit) {
+    if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
       digitalWrite(RPiOffPin, LOW);
       digitalWrite(RPiResetPin, HIGH);  // Нажимаем reset.
       myBlink(3);                       // Задержки в треть секунды будет достаточно.
       digitalWrite(RPiResetPin, LOW);   // Отпускаем reset и позволяем RPi загружаться.
       IsRPiOff = false;
+    }
+  } else {
+    // Если напряжение упало низко, надо послать сигнал на выключение RPi.
+    if (voltage < powerLowBound)
+      cyclesForPowerChange++;
+    else
+      cyclesForPowerChange = 0;
+
+      
+    if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
+      IsRPiOff = true;
+      digitalWrite(RPiOffPin, HIGH);
+      cyclesForPowerChange = 0;
     }
   }
 }
