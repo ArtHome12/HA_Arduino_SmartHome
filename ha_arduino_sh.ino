@@ -8,7 +8,6 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 =============================================================================== */
 
 #include <Wire.h>
-#include <Firmata.h>
 #include <HTU21D.h>
 
 #define TCAADDR 0x70
@@ -53,7 +52,6 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(RPiOffPin, OUTPUT);
     pinMode(RPiResetPin, OUTPUT);
-    digitalWrite(RPiOffPin, LOW);
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
     Wire.begin();
@@ -194,7 +192,7 @@ void powerControl(float voltage){
 
     // Если напряжение выросло и счётчик достаточно отмотал, включаемся.
     if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
-      digitalWrite(RPiOffPin, LOW);
+      digitalWrite(RPiOffPin, HIGH);
       digitalWrite(RPiResetPin, HIGH);  // Нажимаем reset.
       myBlink(3);                       // Задержки в треть секунды будет достаточно.
       digitalWrite(RPiResetPin, LOW);   // Отпускаем reset и позволяем RPi загружаться.
@@ -210,7 +208,7 @@ void powerControl(float voltage){
       
     if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
       IsRPiOff = true;
-      digitalWrite(RPiOffPin, HIGH);
+      digitalWrite(RPiOffPin, LOW);
       cyclesForPowerChange = 0;
     }
   }
