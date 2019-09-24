@@ -127,7 +127,7 @@ void loop()
     float voltage = voltageSum * 2.5 / 1024.0;
 
     // Усредняем с текущим напряжением, но только если это не первый запуск.
-    if (results[0][sensCount] > 0) 
+    if (results[0][sensCount] < 255) 
       results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
     else 
       results[0][sensCount] = voltage;
