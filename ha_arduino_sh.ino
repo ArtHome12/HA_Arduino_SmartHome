@@ -61,7 +61,15 @@ void setup()
     for (uint8_t t = 0; t < sensCount; t++) {
       tcaselect(t);
       myHTU21D.begin();
+
+      // Заполним недействительными значениями во-избежание их появления у пользователя.
+      results[0][t] = 255;
+      results[1][t] = 255;
     }
+
+    // Наряжение и ток.
+    results[0][sensCount] = 255;
+    results[1][sensCount] = 255;
 
     // Ждём установки связи по USB с хостом
     //while (!Serial);
