@@ -16,7 +16,8 @@ const uint8_t sensCount = 8;            // Восемь датчиков вла�
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // will store last time sensors was updated.
-const long interval = 1000;             // interval at which to update (milliseconds).
+const long intervalBig = 10;            // interval at which to update (milliseconds).
+const long intervalSmall = 100;         // interval at which to average.
 
 const int fanPin = 11;                  // the pin where fan is
 const int voltagePin = A0;              // Датчик напряжения
@@ -37,7 +38,8 @@ const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
 
 int rawVoltage[10];
-uint8_t rawVoltageIndex = 0;
+int rawCurrent[10];
+uint8_t rawIndex = 0;
 
 void tcaselect(uint8_t i) {
   Wire.beginTransmission(TCAADDR);
@@ -90,54 +92,74 @@ void loop()
   // Условие, отдельно для защиты от перехода через 0.
   unsigned long condition = currentMillis - previousMillis;
 
-  // Значение напряжения для усреднения
-  rawVoltage[rawVoltageIndex++] = analogRead(voltagePin);
-  if (rawVoltageIndex >= 10)
-    rawVoltageIndex = 0;
+  // Интервал для усреднения.
+  if (condition >= intervalSmall) {
 
-  if (condition >= interval) {
     // save the last time.
     previousMillis = currentMillis;
 
-    // Открываем порт, если ещё не открыт.
-    if (!Serial) {
-      Serial.begin(115200);
-      myBlink(2);
-    } else
-      myBlink(1);
-    
-    // В цикле по всем портам на мультиплексоре.
-    for (uint8_t t = 0; t < sensCount; t++) {
+    // Значение напряжения и тока для усреднения
+    rawVoltage[rawIndex] = analogRead(voltagePin);
+    rawCurrent[rawIndex] = analogRead(currentPin);
+
+    // Если накопили достаточно значений, сохраним их.
+    if (++rawIndex >= intervalBig) {
+      rawIndex = 0;
+
+      // Открываем порт, если ещё не открыт.
+      if (!Serial) {
+        Serial.begin(115200);
+        myBlink(2);
+      } else
+        myBlink(1);
       
-      // Выбираем порт
-      tcaselect(t);
+      // В цикле по всем портам на мультиплексоре.
+      for (uint8_t t = 0; t < sensCount; t++) {
+        
+        // Выбираем порт
+        tcaselect(t);
+    
+        // Считываем температуру и влажность.
+        results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
+        // results[0][t] = t;                       // +-0.3C
+        results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
+      }
+
+      // Усредняем значения
+      unsigned int sumVoltage = rawVoltage[0];
+      unsigned int sumCurrent = rawCurrent[0];
+      for (uint8_t i = 1; i < intervalBig; i++) {
+        sumVoltage += rawVoltage[i];
+        sumCurrent += rawCurrent[i];
+      }
   
-      // Считываем температуру и влажность.
-      results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
-      // results[0][t] = t;                       // +-0.3C
-      results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
+      // Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
+      float voltage = sumVoltage * 25.0 / intervalBig / 1024.0; 
+  
+      // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
+      float current = ((sumCurrent * 5000.0 / intervalBig / 1024.0) - 2500) / mVperAmp;
+
+      // Усредняем с текущими значениями, но только если это не первый запуск.
+      if (results[0][sensCount] < 255) 
+        results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
+      else 
+        results[0][sensCount] = voltage;
+  
+      if (results[1][sensCount] < 255) 
+        results[1][sensCount] = (results[1][sensCount] + current) / 2;
+      else 
+        results[1][sensCount] = current;
+  
+      // Управляем питанием RPi. 
+      powerControl(results[0][sensCount]);
+    
     }
+  }  
 
-    // Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
-    unsigned int voltageSum = rawVoltage[0];
-    for (uint8_t i = 1; i < 10; i++)
-      voltageSum += rawVoltage[i];
 
-    // float voltage = analogRead(voltagePin) * 25.0 / 1024.0;
-    float voltage = voltageSum * 2.5 / 1024.0;
+  // Интервал для сохранения значений.
+  if (condition >= intervalBig) {
 
-    // Усредняем с текущим напряжением, но только если это не первый запуск.
-    if (results[0][sensCount] < 255) 
-      results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
-    else 
-      results[0][sensCount] = voltage;
-
-    // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
-    results[1][sensCount] = ((analogRead(currentPin) * 5000.0 / 1024.0) - 2500) / mVperAmp;
-    //results[1][sensCount] = analogRead(currentPin);
-
-    // Управляем питанием RPi. 
-    powerControl(results[0][sensCount]);
   }
 }
 
