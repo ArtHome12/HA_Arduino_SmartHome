@@ -1,0 +1,31 @@
+{
+  "configurations": [
+    {
+      "name": "Visual Micro",
+      "intelliSenseMode": "windows-msvc-x86",
+      "includePath": [
+        "${projectRoot}..\\ha_arduino_sh",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src\\utility",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\cores\\arduino",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\variants\\eightanaloginputs",
+        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include",
+        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include\\avr",
+        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.2\\include",
+        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.2\\include",
+        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.3\\include"
+      ],
+      "defines": [
+        "__AVR_atmega328p__",
+        "__AVR_ATmega328P__",
+        "__AVR_ATmega328p__",
+        "F_CPU=16000000L",
+        "ARDUINO=108010",
+        "ARDUINO_AVR_NANO",
+        "ARDUINO_ARCH_AVR",
+        "__cplusplus=201103L",
+        "_VMICRO_INTELLISENSE"
+      ]
+    }
+  ]
+}

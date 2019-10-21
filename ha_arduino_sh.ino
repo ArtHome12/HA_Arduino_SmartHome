@@ -57,7 +57,6 @@ void setup()
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
     Wire.begin();
-    //Wire.setClock(1);
 
     // Посылаем команду на инициализацию устройств на всех портах.
     for (uint8_t t = 0; t < sensCount; t++) {
@@ -73,9 +72,7 @@ void setup()
     results[0][sensCount] = 255;
     results[1][sensCount] = 255;
 
-    // Ждём установки связи по USB с хостом
-    //while (!Serial);
-    Serial.begin(115200);
+    // Индикация начала работы
     myBlink(5);
 
     // Чтобы дать время на опрос датчиков напряжения.
@@ -110,8 +107,7 @@ void loop()
       if (!Serial) {
         Serial.begin(115200);
         myBlink(2);
-      } else
-        myBlink(1);
+	}
       
       // В цикле по всем портам на мультиплексоре.
       for (uint8_t t = 0; t < sensCount; t++) {
@@ -121,7 +117,6 @@ void loop()
     
         // Считываем температуру и влажность.
         results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
-        // results[0][t] = t;                       // +-0.3C
         results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
       }
 
@@ -155,12 +150,6 @@ void loop()
     
     }
   }  
-
-
-  // Интервал для сохранения значений.
-  if (condition >= intervalBig) {
-
-  }
 }
 
 
