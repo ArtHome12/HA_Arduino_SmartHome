@@ -15,11 +15,10 @@ const uint8_t sensCount = 8;            // Восемь датчиков вла�
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
-unsigned long previousMillis = 0;       // will store last time sensors was updated.
-const long intervalBig = 10;            // interval at which to update (milliseconds).
-const long intervalSmall = 100;         // interval at which to average.
+unsigned long previousMillis = 0;       // Момент последнего обновления
+const long updateInterval = 1000;		// Интервал обновлений, мс.
 
-const int fanPin = 11;                  // the pin where fan is
+const int fanPin = 11;                  // Пин с вентилятором
 const int voltagePin = A0;              // Датчик напряжения
 const int currentPin = A2;              // Датчик тока
 const int RPiOffPin = 9;                // Управление выключением RPi. 
@@ -27,7 +26,7 @@ const int RPiResetPin = 8;              // Управление перезагр
 
 const int mVperAmp = 185;               // use 100 for 20A Module and 66 for 30A Module
 
-float results[2][sensCount + 1];        // 1 for temperature and 2 for humidity плюс пара напряжение и ток.
+float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и ток.
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили вручную и надо ждать повышения напряжения для её включения.
@@ -37,9 +36,8 @@ int cyclesForPowerChange = 0;           // Количество циклов, п
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
 
-int rawVoltage[10];
-int rawCurrent[10];
-uint8_t rawIndex = 0;
+uint8_t rawVoltage;						// Значение напряжения до усреднения.
+uint8_t rawCurrent;						// Значение тока до усреднения.
 
 void tcaselect(uint8_t i) {
   Wire.beginTransmission(TCAADDR);
@@ -73,7 +71,7 @@ void setup()
     results[1][sensCount] = 255;
 
     // Индикация начала работы
-    myBlink(5);
+    myBlink(3);
 
     // Чтобы дать время на опрос датчиков напряжения.
     previousMillis = millis();
@@ -83,73 +81,51 @@ void setup()
 
 void loop() 
 {
-  // Текущее время.
-  unsigned long currentMillis = millis();
+	// Текущее время.
+	unsigned long currentMillis = millis();
 
-  // Условие, отдельно для защиты от перехода через 0.
-  unsigned long condition = currentMillis - previousMillis;
+	// Условие, отдельно для защиты от перехода через 0.
+	unsigned long condition = currentMillis - previousMillis;
 
-  // Интервал для усреднения.
-  if (condition >= intervalSmall) {
+	// Интервал для усреднения.
+	if (condition >= updateInterval) {
 
-    // save the last time.
-    previousMillis = currentMillis;
+		// save the last time.
+		previousMillis = currentMillis;
 
-    // Значение напряжения и тока для усреднения
-    rawVoltage[rawIndex] = analogRead(voltagePin);
-    rawCurrent[rawIndex] = analogRead(currentPin);
+		// Значение напряжения и тока для усреднения
+		// С учётом усреднения по http://we.easyelectronics.ru/Theory/chestno-prostoy-cifrovoy-filtr.html (5)
+		analogRead(voltagePin);
+		rawVoltage = (15 * rawVoltage + analogRead(voltagePin)) >> 4;
+		analogRead(currentPin);
+		rawCurrent = (15 * rawCurrent + analogRead(currentPin)) >> 4;
 
-    // Если накопили достаточно значений, сохраним их.
-    if (++rawIndex >= intervalBig) {
-      rawIndex = 0;
-
-      // Открываем порт, если ещё не открыт.
-      if (!Serial) {
-        Serial.begin(115200);
-        myBlink(2);
-	}
+		// Открываем порт, если ещё не открыт.
+		if (!Serial) {
+			Serial.begin(115200);
+			myBlink(2);
+		}
       
-      // В цикле по всем портам на мультиплексоре.
-      for (uint8_t t = 0; t < sensCount; t++) {
+		// В цикле по всем портам на мультиплексоре.
+		for (uint8_t t = 0; t < sensCount; t++) {
         
-        // Выбираем порт
-        tcaselect(t);
+			// Выбираем порт
+			tcaselect(t);
     
-        // Считываем температуру и влажность.
-        results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
-        results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
-      }
+			// Считываем температуру и влажность.
+			results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
+			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
+		}
 
-      // Усредняем значения
-      unsigned int sumVoltage = rawVoltage[0];
-      unsigned int sumCurrent = rawCurrent[0];
-      for (uint8_t i = 1; i < intervalBig; i++) {
-        sumVoltage += rawVoltage[i];
-        sumCurrent += rawCurrent[i];
-      }
+		// Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
+		results[0][sensCount] = rawVoltage * 25.0 / 1024.0; 
   
-      // Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
-      float voltage = sumVoltage * 25.0 / intervalBig / 1024.0; 
+		// Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
+		results[1][sensCount] = ((rawCurrent * 5000.0 / 1024.0) - 2500) / mVperAmp;
   
-      // Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
-      float current = ((sumCurrent * 5000.0 / intervalBig / 1024.0) - 2500) / mVperAmp;
-
-      // Усредняем с текущими значениями, но только если это не первый запуск.
-      if (results[0][sensCount] < 255) 
-        results[0][sensCount] = (results[0][sensCount] + voltage) / 2;
-      else 
-        results[0][sensCount] = voltage;
-  
-      if (results[1][sensCount] < 255) 
-        results[1][sensCount] = (results[1][sensCount] + current) / 2;
-      else 
-        results[1][sensCount] = current;
-  
-      // Управляем питанием RPi. 
-      powerControl(results[0][sensCount]);
-    
-    }
-  }  
+		// Управляем питанием RPi. 
+		powerControl(results[0][sensCount]);
+	}
 }
 
 
