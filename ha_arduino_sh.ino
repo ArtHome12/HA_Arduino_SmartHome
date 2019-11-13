@@ -16,7 +16,7 @@ const uint8_t sensCount = 8;            // Восемь датчиков вла�
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // Момент последнего обновления
-const long updateInterval = 1000;		// Интервал обновлений, мс.
+const long updateInterval = 1000;		    // Интервал обновлений, мс.
 
 const int fanPin = 11;                  // Пин с вентилятором
 const int voltagePin = A0;              // Датчик напряжения
@@ -73,6 +73,8 @@ void setup()
     // Индикация начала работы
     myBlink(3);
 
+    Serial.begin(115200);
+
     // Чтобы дать время на опрос датчиков напряжения.
     previousMillis = millis();
 }
@@ -93,13 +95,6 @@ void loop()
 		// save the last time.
 		previousMillis = currentMillis;
 
-		// Значение напряжения и тока для усреднения
-		// С учётом усреднения по http://we.easyelectronics.ru/Theory/chestno-prostoy-cifrovoy-filtr.html (5)
-		analogRead(voltagePin);
-		rawVoltage = (15 * rawVoltage + analogRead(voltagePin)) >> 4;
-		analogRead(currentPin);
-		rawCurrent = (15 * rawCurrent + analogRead(currentPin)) >> 4;
-
 		// Открываем порт, если ещё не открыт.
 		if (!Serial) {
 			Serial.begin(115200);
@@ -117,8 +112,13 @@ void loop()
 			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
 		}
 
+    // Значение напряжения и тока для усреднения
+    // С учётом усреднения по http://we.easyelectronics.ru/Theory/chestno-prostoy-cifrovoy-filtr.html (5)
+    rawVoltage = int(15 * rawVoltage + analogRead(voltagePin)) >> 4;
+    rawCurrent = int(15 * rawCurrent + analogRead(currentPin)) >> 4;
+
 		// Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
-		results[0][sensCount] = rawVoltage * 25.0 / 1024.0; 
+		results[0][sensCount] = rawVoltage ;//* 25.0 / 1024.0; 
   
 		// Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
 		results[1][sensCount] = ((rawCurrent * 5000.0 / 1024.0) - 2500) / mVperAmp;
@@ -208,4 +208,3 @@ void powerControl(float voltage){
     }
   }
 }
-
