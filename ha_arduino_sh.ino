@@ -16,7 +16,7 @@ const uint8_t sensCount = 8;            // Восемь датчиков вла�
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // Момент последнего обновления
-const long updateInterval = 1000;		    // Интервал обновлений, мс.
+const long updateInterval = 1000;		// Интервал обновлений, мс.
 
 const int fanPin = 11;                  // Пин с вентилятором
 const int voltagePin = A0;              // Датчик напряжения
