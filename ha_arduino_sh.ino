@@ -9,6 +9,11 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 
 #include <Wire.h>
 #include <HTU21D.h>
+#include <INA226_asukiaaa.h>
+
+const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(2); // Max 5120 milli ohm
+// const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMicroOhm(2000);
+INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib);
 
 #define TCAADDR 0x70
 const uint8_t sensCount = 8;            // Восемь датчиков влажности и температуры.
@@ -19,25 +24,18 @@ unsigned long previousMillis = 0;       // Момент последнего о�
 const long updateInterval = 1000;		    // Интервал обновлений, мс.
 
 const int fanPin = 11;                  // Пин с вентилятором
-const int voltagePin = A0;              // Датчик напряжения
-const int currentPin = A2;              // Датчик тока
-const int RPiOffPin = 9;                // Управление выключением RPi. 
-const int RPiResetPin = 8;              // Управление перезагрузкой RPi. 
+const int RPiOffPin = 8;                // Управление выключением RPi. 
+const int RPiResetPin = 9;              // Управление перезагрузкой RPi. 
 
-const int mVperAmp = 185;               // use 100 for 20A Module and 66 for 30A Module
-
-float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и ток.
+float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили вручную и надо ждать повышения напряжения для её включения.
-const float powerLowBound = 11.2;       // При падении напряжения ниже этой границы RPi надо отключить.
-const float powerHiBound = 11.6;        // При росте напряжения выше этой границы RPi надо включить, если она была выключена.
+const int16_t powerLowBound = 11200;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int16_t powerHiBound = 11600;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
-
-uint8_t rawVoltage;						// Значение напряжения до усреднения.
-uint8_t rawCurrent;						// Значение тока до усреднения.
 
 void tcaselect(uint8_t i) {
   Wire.beginTransmission(TCAADDR);
@@ -55,6 +53,9 @@ void setup()
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
     Wire.begin();
+
+    voltCurrMeter.setWire(&Wire);
+    voltCurrMeter.begin();
 
     // Посылаем команду на инициализацию устройств на всех портах.
     for (uint8_t t = 0; t < sensCount; t++) {
@@ -89,7 +90,7 @@ void loop()
 	// Условие, отдельно для защиты от перехода через 0.
 	unsigned long condition = currentMillis - previousMillis;
 
-	// Интервал для усреднения.
+	// Интервал опроса датчиков.
 	if (condition >= updateInterval) {
 
 		// save the last time.
@@ -112,19 +113,20 @@ void loop()
 			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
 		}
 
-    // Значение напряжения и тока для усреднения
-    // С учётом усреднения по http://we.easyelectronics.ru/Theory/chestno-prostoy-cifrovoy-filtr.html (5)
-    rawVoltage = int(15 * rawVoltage + analogRead(voltagePin)) >> 4;
-    rawCurrent = int(15 * rawCurrent + analogRead(currentPin)) >> 4;
+    // Значение напряжения mV и мощности mW
+    int16_t mv, mw;
+    if (voltCurrMeter.readMV(&mv) == 0)
+      results[0][sensCount] = mv / 1000.0;
+    else
+      results[0][sensCount] = 255;
+      
+    if (voltCurrMeter.readMW(&mw) == 0)
+      results[1][sensCount] = mw / 1000.0;
+    else
+      results[1][sensCount] = 255;
 
-		// Считываем напряжение (max 25V) http://henrysbench.capnfatz.com/henrys-bench/arduino-voltage-measurements/arduino-25v-voltage-sensor-module-user-manual/
-		results[0][sensCount] = rawVoltage ;//* 25.0 / 1024.0; 
-  
-		// Считываем ток по http://henrysbench.capnfatz.com/henrys-bench/arduino-current-measurements/the-acs712-current-sensor-with-an-arduino/
-		results[1][sensCount] = ((rawCurrent * 5000.0 / 1024.0) - 2500) / mVperAmp;
-  
 		// Управляем питанием RPi. 
-		powerControl(results[0][sensCount]);
+		powerControl(mv);
 	}
 }
 
@@ -169,7 +171,7 @@ void myBlink(uint8_t count) {
 
 
 // Управляет питанием RPi.
-void powerControl(float voltage){
+void powerControl(int16_t voltage){
 
   // У RPi когда на пине Run высокий уровень, она работает. Когда низкий, она перегружается после его отпускания.
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
