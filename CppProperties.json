@@ -5,17 +5,17 @@
       "intelliSenseMode": "windows-msvc-x86",
       "includePath": [
         "${projectRoot}..\\ha_arduino_sh",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src\\utility",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\libraries\\Wire\\src",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\libraries\\Wire\\src\\utility",
         "${projectRoot}..\\..\\..\\Users\\_mag1\\OneDrive\\Документы\\Arduino\\libraries\\INA226_asukiaaa\\src",
         "${projectRoot}..\\..\\..\\Users\\_mag1\\OneDrive\\Документы\\Arduino\\libraries\\HTU21D-master\\src",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\cores\\arduino",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\variants\\eightanaloginputs",
-        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include",
-        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include\\avr",
-        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.2\\include",
-        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.2\\include",
-        "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\4.9.3\\include"
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\cores\\arduino",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\variants\\eightanaloginputs",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino5\\avr\\include",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino5\\avr\\include\\avr",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino5\\lib\\gcc\\avr\\4.9.2\\include",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino5\\lib\\gcc\\avr\\4.9.2\\include",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\AppData\\Local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino5\\lib\\gcc\\avr\\4.9.3\\include"
       ],
       "defines": [
         "__AVR_atmega328p__",

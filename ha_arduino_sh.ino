@@ -209,4 +209,8 @@ void powerControl(int16_t voltage){
       cyclesForPowerChange = 0;
     }
   }
+
+  // Если RPi не в режиме выключения, мигнём один раз.
+  if (!IsRPiOff)
+    myBlink(1);
 }
