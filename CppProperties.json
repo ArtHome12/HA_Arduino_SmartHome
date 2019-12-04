@@ -5,8 +5,6 @@
       "intelliSenseMode": "windows-msvc-x86",
       "includePath": [
         "${projectRoot}..\\ha_arduino_sh",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
-        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src\\utility",
         "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\cores\\arduino",
         "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\variants\\eightanaloginputs",
         "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include",

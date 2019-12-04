@@ -11,7 +11,7 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 #include <HTU21D.h>
 #include <INA226_asukiaaa.h>
 
-const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(2); // Max 5120 milli ohm
+const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); // Max 5120 milli ohm
 // const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMicroOhm(2000);
 INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib);
 
@@ -31,8 +31,8 @@ float results[2][sensCount + 1];        // 1 для температуры, 2 д
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили вручную и надо ждать повышения напряжения для её включения.
-const int16_t powerLowBound = 11200;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
-const int16_t powerHiBound = 11600;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+const int16_t powerLowBound = 12000;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int16_t powerHiBound = 12200;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
