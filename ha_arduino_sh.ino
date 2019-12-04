@@ -12,8 +12,8 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 #include <INA226_asukiaaa.h>
 
 const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); // Max 5120 milli ohm
-// const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMicroOhm(2000);
-INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib);
+#define INA226_ASUKIAAA_MAXAVERAGE_CONFIG 0x4F27                                // Default 0x4127 - for once average. Digit F for 1024 averages
+INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
 #define TCAADDR 0x70
 const uint8_t sensCount = 8;            // Восемь датчиков влажности и температуры.

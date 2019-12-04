@@ -5,6 +5,10 @@
       "intelliSenseMode": "windows-msvc-x86",
       "includePath": [
         "${projectRoot}..\\ha_arduino_sh",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
+        "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src\\utility",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\OneDrive\\Документы\\Arduino\\libraries\\INA226_asukiaaa\\src",
+        "${projectRoot}..\\..\\..\\Users\\_mag1\\OneDrive\\Документы\\Arduino\\libraries\\HTU21D-master\\src",
         "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\cores\\arduino",
         "${projectRoot}..\\..\\Arduino\\hardware\\arduino\\avr\\variants\\eightanaloginputs",
         "${projectRoot}..\\..\\Arduino\\hardware\\tools\\avr\\avr\\include",
