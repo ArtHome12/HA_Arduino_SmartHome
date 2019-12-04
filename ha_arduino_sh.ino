@@ -16,15 +16,15 @@ const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); 
 INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
 #define TCAADDR 0x70
-const uint8_t sensCount = 8;            // Восемь датчиков влажности и температуры.
+const uint8_t sensCount = 8;             // Восемь датчиков влажности и температуры.
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
-unsigned long previousMillis = 0;       // Момент последнего обновления
-const long updateInterval = 1000;		    // Интервал обновлений, мс.
+unsigned long previousMillis = 0;        // Момент последнего обновления
+const long updateInterval = 1000;		     // Интервал обновлений, мс.
 
-const int fanPin = 11;                  // Пин с вентилятором.
-const int buttonPin = 2;                // Кнопка включения/выключения.
+const int fanPin = 3;                   // Пин с вентилятором.
+const int buttonPin = 6;                // Кнопка включения/выключения.
 const int RPiOffPin = 8;                // Управление выключением RPi. 
 const int RPiResetPin = 9;              // Управление перезагрузкой RPi. 
 
