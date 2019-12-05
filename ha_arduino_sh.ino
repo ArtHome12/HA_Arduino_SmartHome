@@ -32,8 +32,8 @@ float results[2][sensCount + 1];        // 1 для температуры, 2 д
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили и надо ждать повышения напряжения для её включения.
-const int16_t powerLowBound = 12000;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
-const int16_t powerHiBound = 12200;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+const int16_t powerLowBound = 11800;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int16_t powerHiBound = 12000;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
@@ -49,6 +49,7 @@ void setup()
 {
     pinMode(fanPin, OUTPUT);
     pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(buttonPin, INPUT_PULLUP);
     pinMode(RPiOffPin, OUTPUT);
     pinMode(RPiResetPin, OUTPUT);
     digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
@@ -178,8 +179,9 @@ void powerControl(int16_t voltage){
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
   // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
 
+
   // Если кнопка питания отжата, то посылаем команду на выключение, если она ещё не выключена.
-  if (digitalRead(buttonPin) != HIGH) {
+  if (digitalRead(buttonPin) == HIGH) {
     if (!IsRPiOff) {
       IsRPiOff = true;
       digitalWrite(RPiOffPin, LOW);
