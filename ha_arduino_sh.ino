@@ -32,8 +32,8 @@ float results[2][sensCount + 1];        // 1 для температуры, 2 д
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
 bool IsRPiOff = false;                  // Когда истина, RPi отключили и надо ждать повышения напряжения для её включения.
-const int16_t powerLowBound = 11800;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
-const int16_t powerHiBound = 12000;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+const int16_t powerLowBound = 12000;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int16_t powerHiBound = 12200;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
@@ -184,7 +184,10 @@ void powerControl(int16_t voltage){
   if (digitalRead(buttonPin) == HIGH) {
     if (!IsRPiOff) {
       IsRPiOff = true;
-      digitalWrite(RPiOffPin, LOW);
+      digitalWrite(RPiOffPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
+
+      // Так как выключили вручную, то при последущем нажатии кнопки нелогично ждать как в случае с автовыключением. Уберём задержку.
+      cyclesForPowerChange = cyclesFromPowerOffLimit;
     }
     // И выходим.
     return;
@@ -210,7 +213,7 @@ void powerControl(int16_t voltage){
 
     // Если напряжение выросло и счётчик достаточно отмотал, включаемся.
     if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
-      digitalWrite(RPiOffPin, HIGH);
+      digitalWrite(RPiOffPin, LOW);     // Состояние для обычной работы.
       digitalWrite(RPiResetPin, HIGH);  // Нажимаем reset.
       myBlink(3);                       // Задержки в треть секунды будет достаточно.
       digitalWrite(RPiResetPin, LOW);   // Отпускаем reset и позволяем RPi загружаться.
@@ -226,7 +229,7 @@ void powerControl(int16_t voltage){
       
     if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
       IsRPiOff = true;
-      digitalWrite(RPiOffPin, LOW);
+      digitalWrite(RPiOffPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
       cyclesForPowerChange = 0;
     }
   }
