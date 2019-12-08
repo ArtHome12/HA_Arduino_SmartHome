@@ -25,15 +25,17 @@ const long updateInterval = 1000;		     // Интервал обновлений
 
 const int fanPin = 3;                   // Пин с вентилятором.
 const int buttonPin = 6;                // Кнопка включения/выключения.
-const int RPiOffPin = 8;                // Управление выключением RPi. 
-const int RPiResetPin = 9;              // Управление перезагрузкой RPi. 
+const int RPiSendShutdownPin = 8;       // Управление выключением RPi. 
+const int RPiPowerOffPin = 9;           // Отключение питания RPi. 
 
 float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
-bool IsRPiOff = false;                  // Когда истина, RPi отключили и надо ждать повышения напряжения для её включения.
-const int16_t powerLowBound = 12000;    // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
-const int16_t powerHiBound = 12200;     // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+bool InShuttingDown = false;            // Когда истина, RPi отправили сигнал на необходимость завершения работы.
+bool RPIOffPower = false;               // Когда истина, с RPi снято питание (на пин PEN отправлен высокий сигнал).
+const int16_t mVoltageLowBound = 11900; // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int16_t mVoltageHiBound = 12000;  // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+const int16_t mWattLowBound = 1000;     // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
@@ -50,9 +52,9 @@ void setup()
     pinMode(fanPin, OUTPUT);
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(buttonPin, INPUT_PULLUP);
-    pinMode(RPiOffPin, OUTPUT);
-    pinMode(RPiResetPin, OUTPUT);
-    digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
+    pinMode(RPiSendShutdownPin, OUTPUT);
+    //pinMode(RPiResetPin, OUTPUT);
+    //digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
 
     Wire.begin();
 
@@ -73,10 +75,10 @@ void setup()
     results[0][sensCount] = 255;
     results[1][sensCount] = 255;
 
+    Serial.begin(115200);
+
     // Индикация начала работы
     myBlink(3);
-
-    Serial.begin(115200);
 
     // Чтобы дать время на опрос датчиков напряжения.
     previousMillis = millis();
@@ -128,7 +130,7 @@ void loop()
       results[1][sensCount] = 255;
 
 		// Управляем питанием RPi. 
-		powerControl(mv);
+		powerControl(mv, mw);
 	}
 }
 
@@ -173,18 +175,21 @@ void myBlink(uint8_t count) {
 
 
 // Управляет питанием RPi.
-void powerControl(int16_t voltage){
+void powerControl(int16_t voltage, int16_t power){
 
   // У RPi когда на пине Run высокий уровень, она работает. Когда низкий, она перегружается после его отпускания.
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
   // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
 
-
+  // Проверка отжатия кнопки человеком.
   // Если кнопка питания отжата, то посылаем команду на выключение, если она ещё не выключена.
   if (digitalRead(buttonPin) == HIGH) {
-    if (!IsRPiOff) {
-      IsRPiOff = true;
-      digitalWrite(RPiOffPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
+    if (!InShuttingDown) {
+      InShuttingDown = true;
+      digitalWrite(RPiSendShutdownPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
+
+      // Включаем светодиод для индикации, что RPi завершает работу.
+      digitalWrite(LED_BUILTIN, HIGH);
 
       // Так как выключили вручную, то при последущем нажатии кнопки нелогично ждать как в случае с автовыключением. Уберём задержку.
       cyclesForPowerChange = cyclesFromPowerOffLimit;
@@ -201,40 +206,69 @@ void powerControl(int16_t voltage){
   //   - если напряжение низкое, то ничего не делаем;
   //   - если напряжение высокое в течение нескольких циклов, посылаем команду на включение.
 
-  if (IsRPiOff) {
-    // Если напряжение обратно выросло (выглянуло солнце), то надо отправить ресет на RPi для её загрузки, но только если прошло 
-    // не менее какого-то времени во-избежание случайных колебаний.
+  // Если RPi в режиме выключения.
+  if (InShuttingDown) {
 
-    // В режиме выключения увеличиваем счётчик, если напряжение высокое.
-    if (voltage > powerHiBound)
-      cyclesForPowerChange++;
-    else
-      cyclesForPowerChange = 0;
+    // Если RPi ещё не выключена, а энергопотребление упало, снимаем с неё питание.
+    if (!RPIOffPower and power < mWattLowBound) {
+      // digitalWrite(RPiPowerOffPin, ?);  // Снимаем питание с RPi.
+      RPIOffPower = true;
 
-    // Если напряжение выросло и счётчик достаточно отмотал, включаемся.
-    if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
-      digitalWrite(RPiOffPin, LOW);     // Состояние для обычной работы.
-      digitalWrite(RPiResetPin, HIGH);  // Нажимаем reset.
-      myBlink(3);                       // Задержки в треть секунды будет достаточно.
-      digitalWrite(RPiResetPin, LOW);   // Отпускаем reset и позволяем RPi загружаться.
-      IsRPiOff = false;
+      // Погасим светодиод.
+      digitalWrite(LED_BUILTIN, LOW);
+
+      // Выходим, чтобы прошёл минимум цикл перед любыми другими действиями.
+      return;
     }
-  } else {
-    // Если напряжение упало низко, надо послать сигнал на выключение RPi.
-    if (voltage < powerLowBound)
-      cyclesForPowerChange++;
-    else
-      cyclesForPowerChange = 0;
 
+    // Если напряжение достаточно высокое (вышло солнце или нажали кнопку питания и перестало действовать условие в начале процедуры).
+    if (voltage > mVoltageHiBound) {
       
-    if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
-      IsRPiOff = true;
-      digitalWrite(RPiOffPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
-      cyclesForPowerChange = 0;
-    }
-  }
+      // Увеличиваем счётчик для подавления случайного дребезга
+      cyclesForPowerChange++;
 
-  // Если RPi не в режиме выключения, мигнём один раз.
-  if (!IsRPiOff)
-    myBlink(1);
+      // Если напряжение сохраняется высоким и счётчик достаточно отмотал, включаемся.
+      if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
+        // Снимаем сигнал о необходимости завершения работы.
+        digitalWrite(RPiSendShutdownPin, LOW);    
+        InShuttingDown = false;                   
+
+        // Если питание уже было снято, восстанавливаем его.
+        if (RPIOffPower) {
+          // Подаём питание на RPi.
+          // digitalWrite(RPiPowerOffPin, ?);       
+          RPIOffPower = false;
+        }
+      }
+    } else
+      // Напряжение остаётся низким, обнуляем счётчик.
+      cyclesForPowerChange = 0;
+
+  } else {
+    // Если RPi в обычном режиме.
+  
+    // Если напряжение упало низко, начинаем отматывать счётчик во-избежание случайных флуктуаций.
+    if (voltage < mVoltageLowBound) {
+      cyclesForPowerChange++;
+      
+      // Если напряжение остаётся низким достаточно долго, отправляем команду на завершение работы.
+      if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
+
+        // Сообщаем RPi о необходимости завершить работу.
+        InShuttingDown = true;
+        digitalWrite(RPiSendShutdownPin, HIGH);  
+
+        // Включаем светодиод для индикации, что RPi завершает работу.
+        digitalWrite(LED_BUILTIN, HIGH);
+
+        // Обнуляем счётчик для предотвращения включения без задержки, если вдруг на следующем цикле напряжение вырастет.
+        cyclesForPowerChange = 0;
+      }
+    } else
+      // Всё ok, напряжение в норме, обычный режим.
+      cyclesForPowerChange = 0;
+
+      // Мигнём один раз.
+      myBlink(1);
+  }
 }
