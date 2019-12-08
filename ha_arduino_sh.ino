@@ -35,7 +35,7 @@ bool InShuttingDown = false;            // Когда истина, RPi отпр
 bool RPIOffPower = false;               // Когда истина, с RPi снято питание (на пин PEN отправлен высокий сигнал).
 const int16_t mVoltageLowBound = 11900; // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
 const int16_t mVoltageHiBound = 12000;  // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
-const int16_t mWattLowBound = 1000;     // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
+const int16_t mWattLowBound = 1500;     // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
 int cyclesForPowerChange = 0;           // Количество циклов, прошедших с момента отправки сигнала на отключение RPi.
 const int cyclesFromPowerOffLimit = 300;// Ставим 5 минут, чтобы RPi успела выключиться перед повторной подачей питания.
 const int cyclesFromPowerOnLimit = 30;  // Если напряжение низкое свыше 30 секунд, RPi надо выключать.
@@ -53,8 +53,7 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(buttonPin, INPUT_PULLUP);
     pinMode(RPiSendShutdownPin, OUTPUT);
-    //pinMode(RPiResetPin, OUTPUT);
-    //digitalWrite(RPiResetPin, HIGH);  // Позволяем RPi загружаться.
+    // pinMode(RPiPowerOffPin, OUTPUT);      // В режиме LOW по-умолчанию не позволяет загрузиться RPi
 
     Wire.begin();
 
@@ -181,6 +180,20 @@ void powerControl(int16_t voltage, int16_t power){
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
   // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
 
+  // Если RPi в режиме выключения, но ещё не выключена, а энергопотребление упало, снимаем с неё питание.
+  if (InShuttingDown and !RPIOffPower and power < mWattLowBound) {
+    // Снимаем питание с RPi после небольшой задержки, так как нижняя граница энергопотребления точно неизвестна.
+    delay(10000);
+    // digitalWrite(RPiPowerOffPin, ?);  
+    RPIOffPower = true;
+
+    // Погасим светодиод.
+    digitalWrite(LED_BUILTIN, LOW);
+
+    // Выходим, чтобы прошёл минимум цикл перед любыми другими действиями.
+    return;
+  }
+
   // Проверка отжатия кнопки человеком.
   // Если кнопка питания отжата, то посылаем команду на выключение, если она ещё не выключена.
   if (digitalRead(buttonPin) == HIGH) {
@@ -208,18 +221,6 @@ void powerControl(int16_t voltage, int16_t power){
 
   // Если RPi в режиме выключения.
   if (InShuttingDown) {
-
-    // Если RPi ещё не выключена, а энергопотребление упало, снимаем с неё питание.
-    if (!RPIOffPower and power < mWattLowBound) {
-      // digitalWrite(RPiPowerOffPin, ?);  // Снимаем питание с RPi.
-      RPIOffPower = true;
-
-      // Погасим светодиод.
-      digitalWrite(LED_BUILTIN, LOW);
-
-      // Выходим, чтобы прошёл минимум цикл перед любыми другими действиями.
-      return;
-    }
 
     // Если напряжение достаточно высокое (вышло солнце или нажали кнопку питания и перестало действовать условие в начале процедуры).
     if (voltage > mVoltageHiBound) {
