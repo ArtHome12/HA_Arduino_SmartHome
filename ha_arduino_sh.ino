@@ -20,8 +20,8 @@ const uint8_t sensCount = 8;             // Восемь датчиков вла
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
-unsigned long previousMillis = 0;        // Момент последнего обновления
-const long updateInterval = 1000;		     // Интервал обновлений, мс.
+unsigned long previousMillis = 0;       // Момент последнего обновления
+const long updateInterval = 1000;		// Интервал обновлений, мс.
 
 const int fanPin = 3;                   // Пин с вентилятором.
 const int buttonPin = 6;                // Кнопка включения/выключения.
@@ -53,7 +53,7 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(buttonPin, INPUT_PULLUP);
     pinMode(RPiSendShutdownPin, OUTPUT);
-    // pinMode(RPiPowerOffPin, OUTPUT);      // В режиме LOW по-умолчанию не позволяет загрузиться RPi
+    pinMode(RPiPowerOffPin, OUTPUT);
 
     Wire.begin();
 
@@ -117,7 +117,7 @@ void loop()
 		}
 
     // Значение напряжения mV и мощности mW
-    int16_t mv, mw;
+    int mv, mw;
     if (voltCurrMeter.readMV(&mv) == 0)
       results[0][sensCount] = mv / 1000.0;
     else
@@ -174,7 +174,7 @@ void myBlink(uint8_t count) {
 
 
 // Управляет питанием RPi.
-void powerControl(int16_t voltage, int16_t power){
+void powerControl(int voltage, int power){
 
   // У RPi когда на пине Run высокий уровень, она работает. Когда низкий, она перегружается после его отпускания.
   // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
@@ -182,9 +182,22 @@ void powerControl(int16_t voltage, int16_t power){
 
   // Если RPi в режиме выключения, но ещё не выключена, а энергопотребление упало, снимаем с неё питание.
   if (InShuttingDown and !RPIOffPower and power < mWattLowBound) {
-    // Снимаем питание с RPi после небольшой задержки, так как нижняя граница энергопотребления точно неизвестна.
-    delay(10000);
-    // digitalWrite(RPiPowerOffPin, ?);  
+
+    // Для защиты от случайных просадок сделаем три измерения.
+    for (int i = 0; i < 2; i++) {
+      delay(300);
+      
+      // При ошибке или при восстановлении энергопотребления выходим.
+      if (voltCurrMeter.readMW(&power) != 0 or power >= mWattLowBound)
+      return;
+    }
+
+    // Снимаем питание с RPi после небольшой задержки, так как нижняя граница энергопотребления точно неизвестна
+    // и RPi может продолжать работать на сниженной мощности ещё какое-то время.
+    delay(60000);
+
+    // Гасим RPi.
+    digitalWrite(RPiPowerOffPin, HIGH);
     RPIOffPower = true;
 
     // Погасим светодиод.
@@ -237,7 +250,7 @@ void powerControl(int16_t voltage, int16_t power){
         // Если питание уже было снято, восстанавливаем его.
         if (RPIOffPower) {
           // Подаём питание на RPi.
-          // digitalWrite(RPiPowerOffPin, ?);       
+          digitalWrite(RPiPowerOffPin, LOW);
           RPIOffPower = false;
         }
       }
