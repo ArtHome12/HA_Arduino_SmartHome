@@ -175,14 +175,14 @@ void powerControl(int voltage, int power){
   // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
 
   // Если RPi в режиме выключения, но ещё не выключена, а энергопотребление упало, снимаем с неё питание.
-  if (InShuttingDown and !RPIOffPower and power < mWattLowBound) {
+  if (InShuttingDown && !RPIOffPower && power < mWattLowBound) {
 
     // Для защиты от случайных просадок сделаем три измерения.
     for (int i = 0; i < 2; i++) {
       delay(300);
       
       // При ошибке или при восстановлении энергопотребления выходим.
-      if (voltCurrMeter.readMW(&power) != 0 or power >= mWattLowBound)
+      if (voltCurrMeter.readMW(&power) != 0 || power >= mWattLowBound)
       return;
     }
 
