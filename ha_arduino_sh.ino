@@ -21,7 +21,7 @@ const uint8_t sensCount = 8;             // Восемь датчиков вла
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // Момент последнего обновления
-const long updateInterval = 1000;		// Интервал обновлений, мс.
+const long updateInterval = 1000;		    // Интервал обновлений, мс.
 
 const int fanPin = 3;                   // Пин с вентилятором.
 const int buttonPin = 6;                // Кнопка включения/выключения.
@@ -79,7 +79,7 @@ void setup()
     // Индикация начала работы
     myBlink(3);
 
-    // Чтобы дать время на опрос датчиков напряжения.
+    // Чтобы дать время на опрос датчиков.
     previousMillis = millis();
 }
 
@@ -90,7 +90,7 @@ void loop()
 	// Текущее время.
 	unsigned long currentMillis = millis();
 
-	// Условие, отдельно для защиты от перехода через 0.
+	// Условие вычисляем отдельно, для защиты от перехода через 0.
 	unsigned long condition = currentMillis - previousMillis;
 
 	// Интервал опроса датчиков.
@@ -99,12 +99,6 @@ void loop()
 		// save the last time.
 		previousMillis = currentMillis;
 
-		// Открываем порт, если ещё не открыт.
-		if (!Serial) {
-			Serial.begin(115200);
-			myBlink(2);
-		}
-      
 		// В цикле по всем портам на мультиплексоре.
 		for (uint8_t t = 0; t < sensCount; t++) {
         
