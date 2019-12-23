@@ -1,0 +1,11 @@
+- id: '1575781629310'
+  alias: Shutdown RPi
+  description: Выключает RPi по сигналу на GPIO
+  trigger:
+  - entity_id: binary_sensor.power
+    from: 'on'
+    platform: state
+    to: 'off'
+  condition: []
+  action:
+  - service: hassio.host_shutdown
