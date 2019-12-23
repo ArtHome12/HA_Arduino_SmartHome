@@ -26,12 +26,14 @@ const long updateInterval = 1000;		    // Интервал обновлений,
 const int fanPin = 3;                   // Пин с вентилятором.
 const int buttonPin = 6;                // Кнопка включения/выключения.
 const int RPiSendShutdownPin = 8;       // Управление выключением RPi. 
-const int RPiPowerOffPin = 9;           // Отключение питания RPi. 
+const int RPiPowerOffPin = 9;           // Когда на пине низкий уровень, RPi работает. Когда высокий, она обесточена.
 
 float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
 const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
 
-bool InShuttingDown = false;            // Когда истина, RPi отправили сигнал на необходимость завершения работы.
+int InShuttingDownCycles = 0;           // Когда 0, всё работает в штатном режиме, иначе сколько циклов назад отправили RPi сигнал на необходимость завершения работы.
+const int InShuttingDownCyclesLimit = 30; // Если RPi до сих пор не выключилась, она зависла и её надо принудительно выключить.
+
 bool RPIOffPower = false;               // Когда истина, с RPi снято питание (на пин PEN отправлен высокий сигнал).
 const int16_t mVoltageLowBound = 11900; // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
 const int16_t mVoltageHiBound = 12000;  // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
@@ -58,8 +60,9 @@ void setup()
   // Если при подаче питания кнопка выключена, снимаем напряжение с RPi.
   if (digitalRead(buttonPin) == HIGH) {
     digitalWrite(RPiPowerOffPin, HIGH);
-    InShuttingDown = true;
+    InShuttingDownCycles = InShuttingDownCyclesLimit;
     RPIOffPower = true;
+    cyclesForPowerChange = cyclesFromPowerOffLimit;
   }  
 
   Wire.begin();
@@ -177,12 +180,8 @@ void myBlink(uint8_t count) {
 // Управляет питанием RPi.
 void powerControl(int voltage, int power){
 
-  // У RPi когда на пине Run высокий уровень, она работает. Когда низкий, она перегружается после его отпускания.
-  // Таким образом, сразу после включения Arduino она должна давать высокий сигнал на пин Run, чтобы RPi нормально работала.
-  // После отключения RPi для её перезагрузки надо на короткое время подать низкий сигнал, а потом снова высокий.
-
   // Если RPi в режиме выключения, но ещё не выключена, а энергопотребление упало, снимаем с неё питание.
-  if (InShuttingDown && !RPIOffPower && power < mWattLowBound) {
+  if (InShuttingDownCycles > 0 && !RPIOffPower && power < mWattLowBound) {
 
     // Для защиты от случайных просадок сделаем несколько измерений.
     for (int i = 0; i < 12; i++) {
@@ -190,7 +189,7 @@ void powerControl(int voltage, int power){
       
       // При ошибке или при восстановлении энергопотребления выходим.
       if (voltCurrMeter.readMW(&power) != 0 || power >= mWattLowBound)
-      return;
+        return;
     }
 
     // Гасим RPi.
@@ -207,8 +206,8 @@ void powerControl(int voltage, int power){
   // Проверка отжатия кнопки человеком.
   // Если кнопка питания отжата, то посылаем команду на выключение, если она ещё не выключена.
   if (digitalRead(buttonPin) == HIGH) {
-    if (!InShuttingDown) {
-      InShuttingDown = true;
+    if (InShuttingDownCycles == 0) {
+      InShuttingDownCycles = 1;
       digitalWrite(RPiSendShutdownPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
 
       // Включаем светодиод для индикации, что RPi завершает работу.
@@ -230,7 +229,7 @@ void powerControl(int voltage, int power){
   //   - если напряжение высокое в течение нескольких циклов, посылаем команду на включение.
 
   // Если RPi в режиме выключения.
-  if (InShuttingDown) {
+  if (InShuttingDownCycles > 0) {
 
     // Если напряжение достаточно высокое (вышло солнце или нажали кнопку питания и перестало действовать условие в начале процедуры).
     if (voltage > mVoltageHiBound) {
@@ -242,7 +241,7 @@ void powerControl(int voltage, int power){
       if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
         // Снимаем сигнал о необходимости завершения работы.
         digitalWrite(RPiSendShutdownPin, LOW);    
-        InShuttingDown = false;                   
+        InShuttingDownCycles = 0;                   
 
         // Если питание уже было снято, восстанавливаем его.
         if (RPIOffPower) {
@@ -255,6 +254,13 @@ void powerControl(int voltage, int power){
       // Напряжение остаётся низким, обнуляем счётчик.
       cyclesForPowerChange = 0;
 
+    // Если прошло достаточно времени и RPi не выключилась, значит она висит и её надо отключать принудительно.
+    if (++InShuttingDownCycles > InShuttingDownCyclesLimit) {
+      digitalWrite(RPiPowerOffPin, HIGH);
+      RPIOffPower = true;
+      cyclesForPowerChange = cyclesFromPowerOffLimit;
+    }
+
   } else {
     // Если RPi в обычном режиме.
   
@@ -266,7 +272,7 @@ void powerControl(int voltage, int power){
       if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
 
         // Сообщаем RPi о необходимости завершить работу.
-        InShuttingDown = true;
+        InShuttingDownCycles = 1;
         digitalWrite(RPiSendShutdownPin, HIGH);  
 
         // Включаем светодиод для индикации, что RPi завершает работу.
