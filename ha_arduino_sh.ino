@@ -21,7 +21,12 @@ const uint8_t sensCount = 8;             // Восемь датчиков вла
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // Момент последнего обновления
-const long updateInterval = 1000;		    // Интервал обновлений, мс.
+const long minDelay = 100;              // Минимально необходимый интервал для работы внутри loop(), мс.
+int delaysCount = 0;                    // Количество прошедших минимальных интервалов.
+const int delaysCountLimit = 10;        // Максимальное количество интервалов, при котором срабатывает логика - 100*10=1000мс или один раз в секунду.
+int blinkCountdown = 0;                 // Количество оставшихся миганий светодиода.
+bool lightIsOn = false;                 // Истина, если в текущем цикле светодиод зажжён.
+
 
 const int fanPin = 3;                   // Пин с вентилятором.
 const int buttonPin = 6;                // Кнопка включения/выключения. При отжатии кнопки RPi выключается, а при нажатии включается, но только если питание высокое
@@ -79,8 +84,8 @@ void setup()
 
   Serial.begin(115200);
 
-  // Индикация начала работы
-  myBlink(3);
+  // Индикация начала работы - мигнём 3 раза.
+  blinkCountdown = 3;
 
   // Чтобы дать время на опрос датчиков.
   previousMillis = millis();
@@ -93,14 +98,38 @@ void loop()
 	// Текущее время.
 	unsigned long currentMillis = millis();
 
-	// Условие вычисляем отдельно, для защиты от перехода через 0.
+	// Условия вычисляем отдельно, для защиты от перехода через 0.
 	unsigned long condition = currentMillis - previousMillis;
 
-	// Интервал опроса датчиков.
-	if (condition >= updateInterval) {
+  // Если слишком мало времени прошло с предыдущего раза.
+  if (condition < minDelay)
+    return;
 
-		// save the last time.
-		previousMillis = currentMillis;
+  // Сохраним время срабатывания.
+  previousMillis = currentMillis;
+
+
+  // Обработка логики мигания светодиодом. Если он горел, его надо погасить в этот раз.
+  //
+  if (lightIsOn) {
+    lightIsOn = false;
+    digitalWrite(LED_BUILTIN, LOW);
+  } else {
+    // Если ещё осталось количество миганий
+    if (blinkCountdown > 0) {
+      // Включаем светодиод и уменьшаем счётчик миганий.
+      lightIsOn = true;
+      digitalWrite(LED_BUILTIN, HIGH);
+      blinkCountdown--;
+    }
+  }
+
+
+	// Основная логика.
+  //
+	if (++delaysCount >= delaysCountLimit) {
+    // Начинаем заново отсчитывать количество маленьких циклов до захода сюда.
+    delaysCount = 0;
 
 		// В цикле по всем портам на мультиплексоре.
 		for (uint8_t t = 0; t < sensCount; t++) {
@@ -131,6 +160,7 @@ void loop()
 }
 
 
+// Входящая информация от RPi.
 void serialEvent() {
   while (Serial.available()) {
     // get the new byte:
@@ -141,14 +171,8 @@ void serialEvent() {
       case 'D': Serial.write((uint8_t*)results, resultsLen); break; // Data
       case 'C': setHeater(HTU21D_ON); break;                        // Check heater
       case 'E': setHeater(HTU21D_OFF); break;                       // End check heater
-      case 'S':                                                     // Start fan
-        digitalWrite(fanPin, HIGH); 
-        digitalWrite(LED_BUILTIN, HIGH); 
-      break;                       
-      case 'F':                                                     // Finish fan
-        digitalWrite(fanPin, LOW); 
-        digitalWrite(LED_BUILTIN, LOW); 
-      break;                       
+      case 'S': digitalWrite(fanPin, HIGH); break;                  // Start fan
+      case 'F': digitalWrite(fanPin, LOW); break;                   // Stop fan
     }
   }
 }
@@ -167,16 +191,6 @@ void setHeater(HTU21D_HEATER_SWITCH heaterSwitch) {
       tcaselect(t);
       myHTU21D.setHeater(heaterSwitch);
     }
-}
-
-// Мигает светодиодом указанное число раз и обеспечивает задержку в 0.2 секунды.
-void myBlink(uint8_t count) {
-  for (uint8_t i = 0; i < count; i++) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW); 
-    delay(100);
-  }
 }
 
 
@@ -227,11 +241,16 @@ void powerControl(int voltage, int power){
     cyclesVoltageLow = 0;
 
   // 4. Проверяем, не отжата ли кнопка. 
-  if (digitalRead(buttonPin) == HIGH)
+  if (digitalRead(buttonPin) == HIGH) {
     // Посылаем (либо держим) сигнал завершения работы малины.
     sendShutdown();
 
+    // Выходим, иначе условие на высокое напряжение аннулирует сигнал кнопки.
+    return;
+  }
+
   // 5. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
+  // Данное условие может отменить сигнал кнопки. Проверка на таймер необязательна для логики, оставляем для быстродействия.
   if (voltage > mVoltageHiBound && powerOffTimer > 0) {
     // Отменяем таймер принудительного отключения.
     powerOffTimer = 0;
@@ -246,114 +265,5 @@ void powerControl(int voltage, int power){
   // 6. Обычная работа.
   if (powerOffTimer == 0)
     // Мигнём один раз.
-    myBlink(1);
-
-//  // Если RPi в режиме выключения, но ещё не выключена, а энергопотребление упало, снимаем с неё питание.
-//  if (InShuttingDownCycles > 0 && !RPIOffPower && power < mWattLowBound) {
-//
-//    // Для защиты от случайных просадок сделаем несколько измерений.
-//    for (int i = 0; i < 12; i++) {
-//      delay(300);
-//      
-//      // При ошибке или при восстановлении энергопотребления выходим.
-//      if (voltCurrMeter.readMW(&power) != 0 || power >= mWattLowBound)
-//        return;
-//    }
-//
-//    // Гасим RPi.
-//    digitalWrite(RPiPowerOffPin, HIGH);
-//    RPIOffPower = true;
-//
-//    // Погасим светодиод.
-//    digitalWrite(LED_BUILTIN, LOW);
-//
-//    // Выходим, чтобы прошёл минимум цикл перед любыми другими действиями.
-//    return;
-//  }
-//
-//  // Проверка отжатия кнопки человеком.
-//  // Если кнопка питания отжата, то посылаем команду на выключение, если она ещё не выключена.
-//  if (digitalRead(buttonPin) == HIGH) {
-//    if (InShuttingDownCycles == 0) {
-//      InShuttingDownCycles = 1;
-//      digitalWrite(RPiSendShutdownPin, HIGH);  // Сообщаем RPi о необходимости завершить работу.
-//
-//      // Включаем светодиод для индикации, что RPi завершает работу.
-//      digitalWrite(LED_BUILTIN, HIGH);
-//
-//      // Так как выключили вручную, то при последущем нажатии кнопки нелогично ждать как в случае с автовыключением. Уберём задержку.
-//      cyclesForPowerChange = cyclesFromPowerOffLimit;
-//    }
-//    // И выходим.
-//    return;
-//  }
-//
-//  // Если кнопка питания нажата, действует логика по питанию:
-//  // - если RPi включена:
-//  //   - если напряжение высокое, то ничего не делаем;
-//  //   - при просадке напряжения в течение нескольких циклов посылаем команду на отключение RPi.
-//  // - если RPi выключена:
-//  //   - если напряжение низкое, то ничего не делаем;
-//  //   - если напряжение высокое в течение нескольких циклов, посылаем команду на включение.
-//
-//  // Если RPi в режиме выключения.
-//  if (InShuttingDownCycles > 0) {
-//
-//    // Если напряжение достаточно высокое (вышло солнце или нажали кнопку питания и перестало действовать условие в начале процедуры).
-//    if (voltage > mVoltageHiBound) {
-//      
-//      // Увеличиваем счётчик для подавления случайного дребезга
-//      cyclesForPowerChange++;
-//
-//      // Если напряжение сохраняется высоким и счётчик достаточно отмотал, включаемся.
-//      if (cyclesForPowerChange > cyclesFromPowerOffLimit) {
-//        // Снимаем сигнал о необходимости завершения работы.
-//        digitalWrite(RPiSendShutdownPin, LOW);    
-//        InShuttingDownCycles = 0;                   
-//
-//        // Если питание уже было снято, восстанавливаем его.
-//        if (RPIOffPower) {
-//          // Подаём питание на RPi.
-//          digitalWrite(RPiPowerOffPin, LOW);
-//          RPIOffPower = false;
-//        }
-//      }
-//    } else
-//      // Напряжение остаётся низким, обнуляем счётчик.
-//      cyclesForPowerChange = 0;
-//
-//    // Если прошло достаточно времени и RPi не выключилась, значит она висит и её надо отключать принудительно.
-//    if (++InShuttingDownCycles > InShuttingDownCyclesLimit) {
-//      digitalWrite(RPiPowerOffPin, HIGH);
-//      RPIOffPower = true;
-//      cyclesForPowerChange = cyclesFromPowerOffLimit;
-//    }
-//
-//  } else {
-//    // Если RPi в обычном режиме.
-//  
-//    // Если напряжение упало низко, начинаем отматывать счётчик во-избежание случайных флуктуаций.
-//    if (voltage < mVoltageLowBound) {
-//      cyclesForPowerChange++;
-//      
-//      // Если напряжение остаётся низким достаточно долго, отправляем команду на завершение работы.
-//      if (cyclesForPowerChange > cyclesFromPowerOnLimit) {
-//
-//        // Сообщаем RPi о необходимости завершить работу.
-//        InShuttingDownCycles = 1;
-//        digitalWrite(RPiSendShutdownPin, HIGH);  
-//
-//        // Включаем светодиод для индикации, что RPi завершает работу.
-//        digitalWrite(LED_BUILTIN, HIGH);
-//
-//        // Обнуляем счётчик для предотвращения включения без задержки, если вдруг на следующем цикле напряжение вырастет.
-//        cyclesForPowerChange = 0;
-//      }
-//    } else
-//      // Всё ok, напряжение в норме, обычный режим.
-//      cyclesForPowerChange = 0;
-//
-//      // Мигнём один раз.
-//      myBlink(1);
-//  }
+    blinkCountdown = 1;
 }
