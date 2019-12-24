@@ -26,6 +26,7 @@ int delaysCount = 0;                    // Количество прошедши
 const int delaysCountLimit = 10;        // Максимальное количество интервалов, при котором срабатывает логика - 100*10=1000мс или один раз в секунду.
 int blinkCountdown = 0;                 // Количество оставшихся миганий светодиода.
 bool lightIsOn = false;                 // Истина, если в текущем цикле светодиод зажжён.
+bool RPiTurnedOff = false;              // Истина, когда с RPi снято питание.
 
 
 const int fanPin = 3;                   // Пин с вентилятором.
@@ -58,10 +59,10 @@ void setup()
   pinMode(RPiPowerOffPin, OUTPUT);
 
   // Если при подаче питания кнопка выключена, сразу завершаем работу.
-  if (digitalRead(buttonPin) == HIGH) {
-    sendShutdown();
-    powerOff();
-  }  
+//  if (digitalRead(buttonPin) == HIGH) {
+//    sendShutdown();
+//    powerOff();
+//  }  
 
   Wire.begin();
 
@@ -131,16 +132,16 @@ void loop()
     // Начинаем заново отсчитывать количество маленьких циклов до захода сюда.
     delaysCount = 0;
 
-		// В цикле по всем портам на мультиплексоре.
-		for (uint8_t t = 0; t < sensCount; t++) {
-        
-			// Выбираем порт
-			tcaselect(t);
-    
-			// Считываем температуру и влажность.
-			results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
-			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
-		}
+//		// В цикле по всем портам на мультиплексоре.
+//		for (uint8_t t = 0; t < sensCount; t++) {
+//        
+//			// Выбираем порт
+//			tcaselect(t);
+//    
+//			// Считываем температуру и влажность.
+//			results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
+//			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
+//		}
 
     // Значение напряжения mV и мощности mW
     int mv, mw;
@@ -208,52 +209,64 @@ void sendShutdown() {
 
 // Отключаем питание RPi.
 void powerOff() {
-    // Гасим RPi.
-    digitalWrite(RPiPowerOffPin, HIGH);
+  // Флаг, что питание снято.
+  RPiTurnedOff = true;
+    
+  // Гасим RPi.
+  digitalWrite(RPiPowerOffPin, HIGH);
 
-    // Погасим светодиод.
-    digitalWrite(LED_BUILTIN, LOW);
+  // Погасим светодиод.
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 
 // Управляет питанием RPi.
 void powerControl(int voltage, int power){
-  // 1. Проверяем, не упало ли энергопотребление RPi.
-  if (power < mWattLoBound) {
-    // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
-    if (cyclesPowerLow++ > cyclesPowerLowLimit)
-      powerOff();
-  } else
-    // Энергопотребление выше минимального, сбрасываем счётчик.
-    cyclesPowerLow = 0;
-
-  // 2. Проверяем, не сработал ли таймер отключения.
-  if (powerOffTimer > powerOffTimerLimit)
-      powerOff();
-
-  // 3. Проверяем не упало ли напряжение источника питания.
-  if (voltage < mVoltageLoBound) {
-    // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на завершение работы.
-    if (cyclesVoltageLow++ > cyclesVoltageLowLimit)
-      sendShutdown();
-  } else
-    // Энергопотребление выше минимального, сбрасываем счётчик.
-    cyclesVoltageLow = 0;
+  // Проверки с 1 по 3 выполняем только если питание не снято.
+  if (!RPiTurnedOff) {
+  
+    // 1. Проверяем, не упало ли энергопотребление RPi.
+    if (power < mWattLoBound) {
+      // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
+      if (cyclesPowerLow++ > cyclesPowerLowLimit)
+        powerOff();
+    } else
+      // Энергопотребление выше минимального, сбрасываем счётчик.
+      cyclesPowerLow = 0;
+  
+    // 2. Проверяем, не сработал ли таймер отключения.
+    if (powerOffTimer > powerOffTimerLimit)
+        powerOff();
+  
+    // 3. Проверяем не упало ли напряжение источника питания.
+    if (voltage < mVoltageLoBound) {
+      // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на завершение работы.
+      if (cyclesVoltageLow++ > cyclesVoltageLowLimit)
+        sendShutdown();
+    } else
+      // Энергопотребление выше минимального, сбрасываем счётчик.
+      cyclesVoltageLow = 0;
+  }
 
   // 4. Проверяем, не отжата ли кнопка. 
   if (digitalRead(buttonPin) == HIGH) {
-    // Посылаем (либо держим) сигнал завершения работы малины.
-    sendShutdown();
+    // Посылаем сигнал завершения работы малины, если ещё не сделано.
+    if (!RPiTurnedOff)
+      sendShutdown();
 
-    // Выходим, иначе условие на высокое напряжение аннулирует сигнал кнопки.
+    // Выходим, иначе условие 5 на высокое напряжение аннулирует сигнал кнопки.
     return;
   }
+  
 
   // 5. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
   // Данное условие может отменить сигнал кнопки. Проверка на таймер необязательна для логики, оставляем для быстродействия.
   if (voltage > mVoltageHiBound && powerOffTimer > 0) {
     // Отменяем таймер принудительного отключения.
     powerOffTimer = 0;
+
+    // Флаг, что питание подано.
+    RPiTurnedOff = false;
 
     // Снимаем сигнал о необходимости завершения работы.
     digitalWrite(RPiSendShutdownPin, LOW);    
