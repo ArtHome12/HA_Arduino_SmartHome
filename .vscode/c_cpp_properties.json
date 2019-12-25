@@ -4,16 +4,36 @@
             "name": "Arduino",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/share/arduino/hardware/tools/avr/lib/avr/include",
-                "/usr/share/arduino/hardware/arduino/cores/arduino/**",
-                "/usr/share/arduino/libraries/**",
-                "/home/artem/Arduino/libraries/**"
+                "/home/artem/arduino/hardware/tools/avr/avr/include",
+                "/home/artem/arduino/hardware/arduino/avr/cores/arduino/**",
+                "/home/artem/arduino/hardware/arduino/avr/libraries/**",
+                "/home/artem/arduino/hardware/arduino/avr/variants/standard",
+                "/home/artem/arduino/libraries/**"
             ],
-            "defines": [],
+            "defines": [
+                "ARDUINO=10810",
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "F_CPU=16000000L",
+                "ARDUINO_AVR_NANO",
+                "ARDUINO_ARCH_AVR",
+                "USBCON"
+            ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64"
+            "intelliSenseMode": "${default}"
+        },
+        {
+            "name": "Linux",
+            "includePath": [
+                "/home/artem/.arduino15/packages/arduino/tools/**",
+                "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/**"
+            ],
+            "forcedInclude": [
+                "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/cores/arduino/Arduino.h"
+            ]
         }
     ],
     "version": 4
