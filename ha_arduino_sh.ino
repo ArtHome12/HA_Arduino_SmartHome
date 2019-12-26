@@ -57,11 +57,14 @@ const byte eepromPowerOffMode = 2;      // Режим до сброса - RPi в
 
 void setup()
 {
-  pinMode(fanPin, OUTPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(buttonPin, INPUT_PULLUP);
-  pinMode(RPiSendShutdownPin, OUTPUT);
-  pinMode(RPiPowerOffPin, OUTPUT);
+  // По рекомендации неиспользуемые пины лучше подтянуть к земле, иначе будут потери электроэнергии при спонтанных переключениях от наводок.
+  // У нас только у кнопки требуется отдельное состояние.
+  for (int i = 0; i < NUM_DIGITAL_PINS; i++) {
+    if (i == buttonPin)
+      pinMode(i, INPUT_PULLUP);
+    else
+      pinMode(i, OUTPUT);
+  }
 
   // Иногда arduino сбрасываетсяпри завершении работы RPi, иногда нет.
   // Восстановим из EEPROM информацию о состоянии до сброса.
@@ -236,6 +239,9 @@ void powerOff() {
     
   // Гасим RPi.
   digitalWrite(RPiPowerOffPin, HIGH);
+
+  // Снимаем сигнал завершения работы для экономии электроэнергии (иногда зажигается сведодиод, если RPi обесточена, а этот сигнал есть).
+  digitalWrite(RPiSendShutdownPin, LOW);
 
   // Погасим светодиод.
   digitalWrite(LED_BUILTIN, LOW);
