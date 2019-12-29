@@ -17,7 +17,8 @@ const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); 
 INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
 #define TCAADDR 0x70
-const uint8_t sensCount = 8;             // Восемь датчиков влажности и температуры.
+const uint8_t HTUCount = 8;             // Восемь датчиков влажности и температуры.
+uint8_t activeHTU = 0;                  // Индекс активного в текущий момент датчика.
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
@@ -35,10 +36,10 @@ const int buttonPin = 6;                // Кнопка включения/вы�
 const int RPiSendShutdownPin = 8;       // Управление выключением RPi. 
 const int RPiPowerOffPin = 9;           // Когда на пине низкий уровень, RPi работает. Когда высокий, она обесточена.
 
-float results[2][sensCount + 1];        // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
-const size_t resultsLen = sizeof(float) * 2 * (sensCount + 1);
+float results[2][HTUCount + 1];         // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
+const size_t resultsLen = sizeof(float) * 2 * (HTUCount + 1);
 
-const int mVoltageLoBound = 11900;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int mVoltageLoBound = 11800;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
 const int mVoltageHiBound = 12000;      // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 const int mWattLoBound = 1500;          // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
 
@@ -52,7 +53,6 @@ const int powerOffTimerLimit = 5*60;    // Предел для счётчика 
 const int eepromAddrShutdown = 0;       // Адрес для хранения в EEPROM признака завершения работы.
 const byte eepromSendShutdownMode = 1;  // Режим до сброса - отправлен сигнал на выключение.
 const byte eepromPowerOffMode = 2;      // Режим до сброса - RPi выключена.
-
 
 
 void setup()
@@ -81,18 +81,19 @@ void setup()
   voltCurrMeter.begin();
 
   // Посылаем команду на инициализацию устройств на всех портах.
-  for (uint8_t t = 0; t < sensCount; t++) {
-    tcaselect(t);
+  for (activeHTU = 0; activeHTU < HTUCount; activeHTU++) {
+    tcaselect(activeHTU);
     myHTU21D.begin();
 
     // Заполним недействительными значениями во-избежание их появления у пользователя.
-    results[0][t] = 255;
-    results[1][t] = 255;
+    results[0][activeHTU] = 255;
+    results[1][activeHTU] = 255;
   }
+  activeHTU = 0;
 
   // Напряжение и ток.
-  results[0][sensCount] = 255;
-  results[1][sensCount] = 255;
+  results[0][HTUCount] = 255;
+  results[1][HTUCount] = 255;
 
   Serial.begin(115200);
 
@@ -142,28 +143,29 @@ void loop()
     // Начинаем заново отсчитывать количество маленьких циклов до захода сюда.
     delaysCount = 0;
 
-//		// В цикле по всем портам на мультиплексоре.
-//		for (uint8_t t = 0; t < sensCount; t++) {
-//        
-//			// Выбираем порт
-//			tcaselect(t);
-//    
-//			// Считываем температуру и влажность.
-//			results[0][t] = myHTU21D.readTemperature();                       // +-0.3C
-//			results[1][t] = myHTU21D.readCompensatedHumidity(results[0][t]);  // +-2%
-//		}
+    // Считываем данные с мультиплексора. Выбираем порт
+    tcaselect(activeHTU);
+  
+    // Считываем температуру (+-0.3C) и влажность (+-2%).
+    float temp = myHTU21D.readTemperature();
+    results[0][activeHTU] = temp;
+    results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
+
+		// Меняем порт на мультиплексоре.
+    if (++activeHTU >= HTUCount)
+      activeHTU = 0;
 
     // Значение напряжения mV и мощности mW
     int16_t mv, mw;
     if (voltCurrMeter.readMV(&mv) == 0)
-      results[0][sensCount] = mv / 1000.0;
+      results[0][HTUCount] = mv / 1000.0;
     else
-      results[0][sensCount] = 255;
+      results[0][HTUCount] = 255;
       
     if (voltCurrMeter.readMW(&mw) == 0)
-      results[1][sensCount] = mw / 1000.0;
+      results[1][HTUCount] = mw / 1000.0;
     else
-      results[1][sensCount] = 255;
+      results[1][HTUCount] = 255;
 
 		// Управляем питанием RPi. 
 		powerControl(mv, mw);
@@ -198,7 +200,7 @@ void tcaselect(uint8_t i) {
 
 // Включение подогрева на всех присоединённых датчиках HTU21D.
 void setHeater(HTU21D_HEATER_SWITCH heaterSwitch) {
-    for (uint8_t t = 0; t < sensCount; t++) {
+    for (uint8_t t = 0; t < HTUCount; t++) {
       tcaselect(t);
       myHTU21D.setHeater(heaterSwitch);
     }
@@ -251,7 +253,7 @@ void powerOff() {
 // Управляет питанием RPi.
 void powerControl(int voltage, int power){
   // 1. Проверяем, не упало ли энергопотребление RPi.
-  if (power < mWattLoBound && !RPiTurnedOff) {
+  if (power < mWattLoBound) {
     // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
     if (cyclesPowerLow++ > cyclesPowerLowLimit)
       powerOff();
