@@ -93,7 +93,7 @@ class multiHTU21DSensor(Entity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        return f'{self._state:0.2f}'
+        return None if self._state is None else f'{self._state:0.2f}'
 
     async def async_update(self):
         """Get the latest data and updates the states. Update only once for 16 sensors. """
@@ -115,4 +115,3 @@ class multiHTU21DSensorExt(multiHTU21DSensor):
     async def async_update(self):
         #_LOGGER.error("update() = %s", self._value)
         self._state = multiHTU21D.BOARD.get_voltage() if self._device_class == "Voltage" else multiHTU21D.BOARD.get_power()
-
