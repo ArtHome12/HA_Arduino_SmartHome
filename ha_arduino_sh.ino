@@ -47,6 +47,8 @@ int cyclesPowerLow = 0;                 // Счётчик цикла для пр
 const int cyclesPowerLowLimit = 5;      // Предел для счётчика цикла для проверки падения энергопотребления.
 int cyclesVoltageLow = 0;               // Счётчик циклов для продолжительных проверок.
 const int cyclesVoltageLowLimit = 30;   // Предел для счётчика циклов.
+int cyclesVoltageHigh = 0;              // Счётчик циклов для продолжительных проверок.
+const int cyclesVoltageHighLimit = 30;  // Предел для счётчика циклов.
 int powerOffTimer = 0;                  // Счётчик циклов отключения питания RPi.
 const int powerOffTimerLimit = 5*60;    // Предел для счётчика циклов отключения питания RPi.
 
@@ -285,29 +287,34 @@ void powerControl(int voltage, int power){
   
 
   // 5. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
-  // Данное условие может отменить сигнал кнопки. Проверка на таймер необязательна для логики, оставляем для быстродействия.
+  // Проверка на отключенность необязательна для логики, оставляем для быстродействия.
   if (voltage > mVoltageHiBound && powerOffTimer > 0) {
-    // Отменяем таймер принудительного отключения.
-    powerOffTimer = 0;
+    // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на включение.
+    if (cyclesVoltageHigh++ > cyclesVoltageHighLimit) {
+      // Отменяем таймер принудительного отключения.
+      powerOffTimer = 0;
 
-    // Флаг, что питание подано.
-    RPiTurnedOff = false;
+      // Флаг, что питание подано.
+      RPiTurnedOff = false;
 
-    // Заново запускаем счётчик низкого энергопотребления с форой на холостой цикл и раскачку.
-    cyclesPowerLow = -2;
+      // Заново запускаем счётчик низкого энергопотребления с форой на холостой цикл и раскачку.
+      cyclesPowerLow = -2;
 
-    // Снимаем сигнал о необходимости завершения работы.
-    digitalWrite(RPiSendShutdownPin, LOW);    
-    
-    // Подаём питание на RPi.
-    digitalWrite(RPiPowerOffPin, LOW);
-    
-    // Мигнём 5 раз (и шестой раз добавится в коде ниже).
-    blinkCountdown += 5;
+      // Снимаем сигнал о необходимости завершения работы.
+      digitalWrite(RPiSendShutdownPin, LOW);    
+      
+      // Подаём питание на RPi.
+      digitalWrite(RPiPowerOffPin, LOW);
+      
+      // Мигнём 5 раз (и шестой раз добавится в коде ниже).
+      blinkCountdown += 5;
 
-    // Снимем в энергонезависимой памяти все флаги.
-    EEPROM.write(eepromAddrShutdown, 0);
-  }
+      // Снимем в энергонезависимой памяти все флаги.
+      EEPROM.write(eepromAddrShutdown, 0);
+    }
+  } else
+    // Напряжение недостаточно высокое, сбросим счётчик.
+    cyclesVoltageHigh = 0;  
 
   // 6. Обычная работа.
   if (powerOffTimer == 0)
