@@ -73,7 +73,7 @@ void setup()
   // RPi могла быть в режиме завершения работы и уже выключенной.
   switch (EEPROM.read(eepromAddrShutdown)) {
     case eepromSendShutdownMode:  powerOffTimer = 1; break;
-    case eepromPowerOffMode:      powerOffTimer = 1; RPiTurnedOff = true; powerOff(); break;
+    case eepromPowerOffMode:      powerOffTimer = 1; RPiTurnedOff = true; powerOff(); cyclesVoltageHigh = cyclesVoltageHighLimit - 1; break;
   }
   
 
