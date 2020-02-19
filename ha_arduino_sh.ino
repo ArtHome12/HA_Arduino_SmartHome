@@ -52,6 +52,9 @@ const int cyclesVoltageHighLimit = 30;  // Предел для счётчика 
 int powerOffTimer = 0;                  // Счётчик циклов отключения питания RPi.
 const int powerOffTimerLimit = 5*60;    // Предел для счётчика циклов отключения питания RPi.
 
+const unsigned long maxWorkTime = 1000*60*60*24*2;  // Максимальное время непрерывной работы.
+unsigned long currentMillis = 0;        // Текущее время работы с момента загрузки.
+
 const int eepromAddrShutdown = 0;       // Адрес для хранения в EEPROM признака завершения работы.
 const byte eepromSendShutdownMode = 1;  // Режим до сброса - отправлен сигнал на выключение.
 const byte eepromPowerOffMode = 2;      // Режим до сброса - RPi выключена.
@@ -111,7 +114,7 @@ void setup()
 void loop() 
 {
 	// Текущее время.
-	unsigned long currentMillis = millis();
+	currentMillis = millis();
 
 	// Условия вычисляем отдельно, для защиты от перехода через 0.
 	unsigned long condition = currentMillis - previousMillis;
@@ -276,8 +279,8 @@ void powerControl(int voltage, int power){
     // Энергопотребление выше минимального, сбрасываем счётчик.
     cyclesVoltageLow = 0;
 
-  // 4. Проверяем, не отжата ли кнопка. 
-  if (digitalRead(buttonPin) == HIGH) {
+  // 4. Проверяем, не отжата ли кнопка и заодно тут же на предельное время работы без перезагрузки.
+  if (digitalRead(buttonPin) == HIGH || currentMillis > maxWorkTime) {
     // Посылаем сигнал завершения работы малины, если ещё не сделано.
     sendShutdown();
 
