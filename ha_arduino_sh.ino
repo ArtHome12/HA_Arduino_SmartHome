@@ -37,7 +37,11 @@ const int RPiSendShutdownPin = 8;       // Управление выключен
 const int RPiPowerOffPin = 9;           // Когда на пине низкий уровень, RPi работает. Когда высокий, она обесточена.
 
 float results[2][HTUCount + 1];         // 1 для температуры, 2 для влажности плюс пара напряжение и мощность.
+#ifndef __INTELLISENSE__                // Обходим глюк интеллисенса, не понимающего include внутри ifdef.
 const size_t resultsLen = sizeof(float) * 2 * (HTUCount + 1);
+#else
+const unsigned int resultsLen = sizeof(float) * 2 * (HTUCount + 1);
+#endif
 
 const int mVoltageLoBound = 11700;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
 const int mVoltageHiBound = 12000;      // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.

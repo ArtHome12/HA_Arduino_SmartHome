@@ -2,5 +2,5 @@
     "sketch": "ha_arduino_sh.ino",
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
-    "output": "/home/artem/git/ha_arduino_sh/.bin"
+    "output": ".bin"
 }
