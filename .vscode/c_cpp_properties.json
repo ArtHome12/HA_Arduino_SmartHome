@@ -5,10 +5,13 @@
             "includePath": [
                 "/home/artem/.arduino15/packages/arduino/tools/**",
                 "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/**",
-                "/home/artem/arduino/libraries/**"
+                "/home/artem/arduino/libraries/**",
+                "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\**",
+                "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\**"
             ],
             "forcedInclude": [
-                "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/cores/arduino/Arduino.h"
+                "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/cores/arduino/Arduino.h",
+                "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\cores\\arduino\\Arduino.h"
             ],
             "intelliSenseMode": "gcc-x64",
             "compilerPath": "/usr/bin/clang",
