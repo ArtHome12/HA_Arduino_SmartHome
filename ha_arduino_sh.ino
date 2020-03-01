@@ -57,6 +57,7 @@ int powerOffTimer = 0;                  // Счётчик циклов откл�
 const int powerOffTimerLimit = 5*60;    // Предел для счётчика циклов отключения питания RPi.
 
 const unsigned long maxWorkTime = 1000*60*60*24*2;  // Максимальное время непрерывной работы.
+bool needToReboot  = false;             // Если система должна быть перезагружена, для обхода сброса через USB при завершении малины.
  
 const int eepromAddrShutdown = 0;       // Адрес для хранения в EEPROM признака завершения работы.
 const byte eepromSendShutdownMode = 1;  // Режим до сброса - отправлен сигнал на выключение.
@@ -78,7 +79,7 @@ void setup()
   // Восстановим из EEPROM информацию о состоянии до сброса.
   // RPi могла быть в режиме завершения работы и уже выключенной.
   switch (EEPROM.read(eepromAddrShutdown)) {
-    case eepromSendShutdownMode:  powerOffTimer = 1; previousMillis = maxWorkTime + minDelay; break;
+    case eepromSendShutdownMode:  powerOffTimer = 1; needToReboot = true; break;
     case eepromPowerOffMode:      powerOffTimer = 1; RPiTurnedOff = true; powerOff(); cyclesVoltageHigh = cyclesVoltageHighLimit - 1; break;
   }
   
@@ -236,6 +237,9 @@ void sendShutdown() {
   digitalWrite(LED_BUILTIN, HIGH);
 }
 
+//declare reset function at address 0
+void(* resetFunc) (void) = 0;
+
 // Отключаем питание RPi.
 void powerOff() {
 
@@ -255,8 +259,10 @@ void powerOff() {
 
   // Погасим светодиод.
   digitalWrite(LED_BUILTIN, LOW);
-}
 
+  // Перезагрузим ардуину для сброса millis.
+  resetFunc();
+}
 
 // Управляет питанием RPi.
 void powerControl(int voltage, int power){
@@ -283,7 +289,8 @@ void powerControl(int voltage, int power){
     cyclesVoltageLow = 0;
 
   // 4. Проверяем, не отжата ли кнопка и заодно тут же на предельное время работы без перезагрузки.
-  if (digitalRead(buttonPin) == HIGH || previousMillis > maxWorkTime) {
+  needToReboot = previousMillis > maxWorkTime;
+  if (digitalRead(buttonPin) == HIGH || needToReboot) {
     // Посылаем сигнал завершения работы малины, если ещё не сделано.
     sendShutdown();
 
