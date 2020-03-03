@@ -16,11 +16,12 @@ const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); 
 #define INA226_ASUKIAAA_MAXAVERAGE_CONFIG 0x4F27                                // Default 0x4127 - for once average. Digit F for 1024 averages
 INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
+HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);// Интерфейс к датчикам температуры и влажности.
+
 #define TCAADDR 0x70
 const uint8_t HTUCount = 8;             // Восемь датчиков влажности и температуры.
 uint8_t activeHTU = 0;                  // Индекс активного в текущий момент датчика.
 
-HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);
 
 unsigned long previousMillis = 0;       // Момент последнего обновления
 const long minDelay = 100;              // Минимально необходимый интервал для работы внутри loop(), мс.
@@ -92,7 +93,9 @@ void setup()
   // Посылаем команду на инициализацию устройств на всех портах.
   for (activeHTU = 0; activeHTU < HTUCount; activeHTU++) {
     tcaselect(activeHTU);
+    delay(50);
     myHTU21D.begin();
+    delay(50);
 
     // Заполним недействительными значениями во-избежание их появления у пользователя.
     results[0][activeHTU] = 255;
@@ -154,11 +157,14 @@ void loop()
 
     // Считываем данные с мультиплексора. Выбираем порт
     tcaselect(activeHTU);
+    delay(50);
   
     // Считываем температуру (+-0.3C) и влажность (+-2%).
     float temp = myHTU21D.readTemperature();
-    results[0][activeHTU] = temp;
+    delay(50);
+    results[0][activeHTU] = temp == 255? 3: temp;
     results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
+    delay(50);
 
 		// Меняем порт на мультиплексоре.
     if (++activeHTU >= HTUCount)
@@ -237,8 +243,6 @@ void sendShutdown() {
   digitalWrite(LED_BUILTIN, HIGH);
 }
 
-//declare reset function at address 0
-void(* resetFunc) (void) = 0;
 
 // Отключаем питание RPi.
 void powerOff() {
@@ -259,9 +263,6 @@ void powerOff() {
 
   // Погасим светодиод.
   digitalWrite(LED_BUILTIN, LOW);
-
-  // Перезагрузим ардуину для сброса millis.
-  resetFunc();
 }
 
 // Управляет питанием RPi.
