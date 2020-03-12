@@ -14,7 +14,7 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 
 const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); // Max 5120 milli ohm
 #define INA226_ASUKIAAA_MAXAVERAGE_CONFIG 0x4F27                                // Default 0x4127 - for once average. Digit F for 1024 averages
-INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_VDD_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
+INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_VDD_A1_VDD, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);// Интерфейс к датчикам температуры и влажности.
 

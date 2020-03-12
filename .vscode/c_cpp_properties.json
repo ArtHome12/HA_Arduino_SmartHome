@@ -7,7 +7,8 @@
                 "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/**",
                 "/home/artem/arduino/libraries/**",
                 "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.2\\**",
-                "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\**"
+                "C:\\Users\\_mag1\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\**",
+                "/home/artem/.arduino15/packages/arduino/tools/**"
             ],
             "forcedInclude": [
                 "/home/artem/.arduino15/packages/arduino/hardware/avr/1.8.2/cores/arduino/Arduino.h",
