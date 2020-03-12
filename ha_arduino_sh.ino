@@ -14,7 +14,7 @@ Copyright (c) 2019 by Artem Khomenko _mag12@yahoo.com.
 
 const uint16_t ina226calib = INA226_asukiaaa::calcCalibByResisterMilliOhm(100); // Max 5120 milli ohm
 #define INA226_ASUKIAAA_MAXAVERAGE_CONFIG 0x4F27                                // Default 0x4127 - for once average. Digit F for 1024 averages
-INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_GND_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
+INA226_asukiaaa voltCurrMeter(INA226_ASUKIAAA_ADDR_A0_VDD_A1_GND, ina226calib, INA226_ASUKIAAA_MAXAVERAGE_CONFIG);
 
 HTU21D myHTU21D(HTU21D_RES_RH12_TEMP14);// Интерфейс к датчикам температуры и влажности.
 
@@ -93,9 +93,7 @@ void setup()
   // Посылаем команду на инициализацию устройств на всех портах.
   for (activeHTU = 0; activeHTU < HTUCount; activeHTU++) {
     tcaselect(activeHTU);
-    delay(50);
     myHTU21D.begin();
-    delay(50);
 
     // Заполним недействительными значениями во-избежание их появления у пользователя.
     results[0][activeHTU] = 255;
@@ -157,14 +155,11 @@ void loop()
 
     // Считываем данные с мультиплексора. Выбираем порт
     tcaselect(activeHTU);
-    delay(50);
   
     // Считываем температуру (+-0.3C) и влажность (+-2%).
     float temp = myHTU21D.readTemperature();
-    delay(50);
-    results[0][activeHTU] = temp == 255? 3: temp;
+    results[0][activeHTU] = temp;
     results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
-    delay(50);
 
 		// Меняем порт на мультиплексоре.
     if (++activeHTU >= HTUCount)
