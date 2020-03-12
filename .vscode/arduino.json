@@ -2,5 +2,6 @@
     "sketch": "ha_arduino_sh.ino",
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
-    "output": ".bin"
+    "output": ".bin",
+    "programmer": "AVRISP mkII"
 }
