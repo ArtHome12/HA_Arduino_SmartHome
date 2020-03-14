@@ -42,6 +42,7 @@ float results[2][HTUCount + 1];         // 1 для температуры, 2 д
 const size_t resultsLen = sizeof(float) * 2 * (HTUCount + 1);
 #else
 const unsigned int resultsLen = sizeof(float) * 2 * (HTUCount + 1);
+#define INT16_MAX 0x7fffL
 #endif
 
 const int mVoltageLoBound = 11700;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
@@ -167,15 +168,19 @@ void loop()
 
     // Значение напряжения mV и мощности mW
     int16_t mv, mw;
-    if (voltCurrMeter.readMV(&mv) == 0)
+    if (voltCurrMeter.readMV(&mv) == 0) 
       results[0][HTUCount] = mv / 1000.0;
-    else
+    else {
       results[0][HTUCount] = 255;
-      
+      mv = INT16_MAX;
+    }
+
     if (voltCurrMeter.readMW(&mw) == 0)
       results[1][HTUCount] = mw / 1000.0;
-    else
+    else {
       results[1][HTUCount] = 255;
+      mw = INT16_MAX;
+    }
 
 		// Управляем питанием RPi. 
 		powerControl(mv, mw);
