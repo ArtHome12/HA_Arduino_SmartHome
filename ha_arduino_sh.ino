@@ -25,7 +25,7 @@ uint8_t activeHTU = 0;                  // Индекс активного в т
 
 unsigned long previousMillis = 0;       // Момент последнего обновления, мс.
 const long minDelay = 100;              // Минимально необходимый интервал для работы внутри loop(), мс.
-const unsigned long maxWorkTime = 1000*60*60*24*2;  // Максимально допустимое время непрерывной работы, мс.
+const unsigned long maxWorkTime = 86400000UL;  // Максимально допустимое время непрерывной работы, мс.
 int delaysCount = 0;                    // Количество прошедших минимальных интервалов.
 const int delaysCountLimit = 10;        // Максимальное количество интервалов, при котором срабатывает логика - 100*10=1000мс или один раз в секунду.
 int blinkCountdown = 0;                 // Количество оставшихся миганий светодиода.
@@ -161,8 +161,10 @@ void loop()
     results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
 
     // ОТЛАДКА, ВРЕМЕННО!
-    if (activeHTU == 1)
+    if (activeHTU == 1) {
       results[1][activeHTU] = previousMillis / 1000;
+      results[0][activeHTU] = maxWorkTime / 1000;
+    }
 
 		// Меняем порт на мультиплексоре.
     if (++activeHTU >= HTUCount)
