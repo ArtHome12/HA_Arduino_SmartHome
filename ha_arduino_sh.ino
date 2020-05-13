@@ -47,8 +47,8 @@ const unsigned int resultsLen = sizeof(float) * 2 * (HTUCount + 1);
 #define INT16_MAX 0x7fffL
 #endif
 
-const int mVoltageLoBound = 11700;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
-const int mVoltageHiBound = 12000;      // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
+const int mVoltageLoBound = 11100;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int mVoltageHiBound = 11800;      // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 const int mWattLoBound = 1500;          // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
 
 int cyclesPowerLow = 0;                 // Счётчик цикла для проверки падения энергопотребления.
