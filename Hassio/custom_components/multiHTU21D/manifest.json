@@ -1,8 +1,10 @@
 {
-    "domain": "MultiHTU21D",
-    "name": "MultiHTU21D",
+    "domain": "multiHTU21D",
+    "name": "multiHTU21D",
     "documentation": "",
     "dependencies": [],
     "codeowners": [],
-    "requirements": []
+    "requirements": [],
+    "iot_class": "local_polling",
+    "version": "1.0.0"
   }

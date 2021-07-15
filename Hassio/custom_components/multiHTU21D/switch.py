@@ -11,7 +11,7 @@ import logging
 
 import voluptuous as vol # pylint: disable=import-error
 
-from homeassistant.components.switch import (SwitchDevice, PLATFORM_SCHEMA) # pylint: disable=import-error
+from homeassistant.components.switch import (SwitchEntity, PLATFORM_SCHEMA) # pylint: disable=import-error
 from homeassistant.const import CONF_NAME # pylint: disable=import-error
 import homeassistant.helpers.config_validation as cv # pylint: disable=import-error
 import custom_components.multiHTU21D as multiHTU21D           
@@ -38,14 +38,13 @@ async def async_setup_platform(hass, config, async_add_entities,
     async_add_entities(switches)
 
 
-class multiHTU21DHeaterSwitch(SwitchDevice):
+class multiHTU21DHeaterSwitch(SwitchEntity):
     """Representation of an Heater switch."""
 
     def __init__(self, name):
         """Initialize the Switch."""
         self._name = name
         self._state = False
-
 
     @property
     def name(self):
@@ -69,32 +68,32 @@ class multiHTU21DHeaterSwitch(SwitchDevice):
         await self.hass.async_add_job(multiHTU21D.BOARD.turnHeater, self._state)
 
 
-class multiHTU21DFanSwitch(SwitchDevice):
-    """Representation of an Heater switch."""
+class multiHTU21DFanSwitch(SwitchEntity):
+   """Representation of an Heater switch."""
 
-    def __init__(self, name):
-        """Initialize the Switch."""
-        self._name = name
-        self._state = False
+   def __init__(self, name):
+      """Initialize the Switch."""
+      self._name = name
+      self._state = False
 
+   @property
+   def name(self):
+      """Get the name of the switch."""
+      return self._name
 
-    @property
-    def name(self):
-        """Get the name of the switch."""
-        return self._name
+   @property
+   def is_on(self):
+      """Return true if heaters is on."""
+      return self._state
 
-    @property
-    def is_on(self):
-        """Return true if heaters is on."""
-        return self._state
+   def turn_on(self, **kwargs):
+      """Turn the pin to high/on."""
+      self._state = True
+      multiHTU21D.BOARD.turnFan(self._state)
+      # self.hass.async_create_task(multiHTU21D.BOARD.turnFan, self._state)
 
-    async def turn_on(self, **kwargs):
-        """Turn the pin to high/on."""
-        self._state = True
-        # multiHTU21D.BOARD.turnFan(self._state)
-        await self.hass.async_add_job(multiHTU21D.BOARD.turnFan, self._state)
-
-    async def turn_off(self, **kwargs):
-        """Turn the pin to low/off."""
-        self._state = False
-        await self.hass.async_add_job(multiHTU21D.BOARD.turnFan, self._state)
+   def turn_off(self, **kwargs):
+      """Turn the pin to low/off."""
+      self._state = False
+      multiHTU21D.BOARD.turnFan(self._state)
+      # self.hass.async_create_task(multiHTU21D.BOARD.turnFan, self._state)

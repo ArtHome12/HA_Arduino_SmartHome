@@ -93,7 +93,7 @@ class multiHTU21DSensor(Entity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        return None if self._state is None else f'{self._state:0.2f}'
+        return self._state
 
     async def async_update(self):
         """Get the latest data and updates the states. Update only once for 16 sensors. """

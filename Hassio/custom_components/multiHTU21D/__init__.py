@@ -4,7 +4,7 @@ Main platform file.
 
 Licensed under the terms of the GPL version 3.
 http://www.gnu.org/licenses/gpl-3.0.html
-Copyright(c) 2013-2016 by Artem Khomenko _mag12@yahoo.com.
+Copyright(c) 2013-2021 by Artem Khomenko _mag12@yahoo.com.
 """
 
 import logging
@@ -108,7 +108,7 @@ class ArduinoBoard:
                 self._temperatures.append(round(rawArray[i]) if rawArray[i] < 255.0 else math.nan)
 
             # Plus voltage
-            self._voltage = rawArray[8] if rawArray[8] < 255.0 else math.nan
+            self._voltage = round(rawArray[8], 2) if rawArray[8] < 255.0 else math.nan
             
 
             # Read humidity and power
@@ -125,7 +125,7 @@ class ArduinoBoard:
                 self._humidities.append(round(rawArray[i]) if rawArray[i] < 255.0 else math.nan)
 
             # Plus power
-            self._power = rawArray[8] if rawArray[8] < 255.0 else math.nan
+            self._power = round(rawArray[8], 2) if rawArray[8] < 255.0 else math.nan
 
         #except IOError:
         except:

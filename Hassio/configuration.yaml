@@ -62,9 +62,7 @@ sun:
 multiHTU21D:
   port: /dev/ttyUSB0 
 
-# Weather prediction
 sensor:
-  - platform: yr
   - platform: multiHTU21D
     sensors:
       1:
