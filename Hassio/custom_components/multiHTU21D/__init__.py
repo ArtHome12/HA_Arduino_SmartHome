@@ -105,10 +105,10 @@ class ArduinoBoard:
             # Round and replace error value on None
             self._temperatures = array.array('f')
             for i in range(8):
-                self._temperatures.append(round(rawArray[i]) if rawArray[i] < 255.0 else math.nan)
+                self._temperatures.append(rawArray[i] if rawArray[i] < 255.0 else math.nan)
 
             # Plus voltage
-            self._voltage = round(rawArray[8], 2) if rawArray[8] < 255.0 else math.nan
+            self._voltage = rawArray[8] if rawArray[8] < 255.0 else math.nan
             
 
             # Read humidity and power
@@ -122,10 +122,10 @@ class ArduinoBoard:
             # Round and replace error value on None
             self._humidities = array.array('f')
             for i in range(8):
-                self._humidities.append(round(rawArray[i]) if rawArray[i] < 255.0 else math.nan)
+                self._humidities.append(rawArray[i] if rawArray[i] < 255.0 else math.nan)
 
             # Plus power
-            self._power = round(rawArray[8], 2) if rawArray[8] < 255.0 else math.nan
+            self._power = rawArray[8] if rawArray[8] < 255.0 else math.nan
 
         #except IOError:
         except:

@@ -22,8 +22,7 @@ DEPENDENCIES = ['multiHTU21D']
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_platform(hass, config, async_add_entities,
-                               discovery_info=None):
+async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the Arduino platform."""
     # Verify that Arduino board is present
     if multiHTU21D.BOARD is None:
@@ -37,9 +36,8 @@ async def async_setup_platform(hass, config, async_add_entities,
     ]
     async_add_entities(switches)
 
-
-class multiHTU21DHeaterSwitch(SwitchEntity):
-    """Representation of an Heater switch."""
+class multiHTU21DSwitch(SwitchEntity):
+    """Representation of switch on board."""
 
     def __init__(self, name):
         """Initialize the Switch."""
@@ -56,35 +54,23 @@ class multiHTU21DHeaterSwitch(SwitchEntity):
         """Return true if heaters is on."""
         return self._state
 
-    async def turn_on(self, **kwargs):
+
+class multiHTU21DHeaterSwitch(multiHTU21DSwitch):
+    """Representation of an Heater switch."""
+
+    def turn_on(self, **kwargs):
         """Turn the pin to high/on."""
         self._state = True
-        await self.hass.async_add_job(multiHTU21D.BOARD.turnHeater, self._state)
-        # multiHTU21D.BOARD.turnHeater(self._state)
+        multiHTU21D.BOARD.turnHeater(self._state)
 
-    async def turn_off(self, **kwargs):
+    def turn_off(self, **kwargs):
         """Turn the pin to low/off."""
         self._state = False
-        await self.hass.async_add_job(multiHTU21D.BOARD.turnHeater, self._state)
+        multiHTU21D.BOARD.turnHeater(self._state)
 
 
-class multiHTU21DFanSwitch(SwitchEntity):
+class multiHTU21DFanSwitch(multiHTU21DSwitch):
    """Representation of an Heater switch."""
-
-   def __init__(self, name):
-      """Initialize the Switch."""
-      self._name = name
-      self._state = False
-
-   @property
-   def name(self):
-      """Get the name of the switch."""
-      return self._name
-
-   @property
-   def is_on(self):
-      """Return true if heaters is on."""
-      return self._state
 
    def turn_on(self, **kwargs):
       """Turn the pin to high/on."""

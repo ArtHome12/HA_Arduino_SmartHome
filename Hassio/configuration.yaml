@@ -64,28 +64,6 @@ multiHTU21D:
 
 sensor:
   - platform: multiHTU21D
-    sensors:
-      1:
-        name_temperature: "Температура 1"
-        name_humidity: "Влажность 1"
-      2:
-        name_temperature: "Температура 2"
-        name_humidity: "Влажность 2"
-      3:
-        name_temperature: "Температура 3"
-        name_humidity: "Влажность 3"
-      4:
-        name_temperature: "Температура 4"
-        name_humidity: "Влажность 4"
-      5:
-        name_temperature: "Температура 5"
-        name_humidity: "Влажность 5"
-      6:
-        name_temperature: "Температура 6"
-        name_humidity: "Влажность 6"
-      7:
-        name_temperature: "Температура 7"
-        name_humidity: "Влажность 7"
 
 binary_sensor:
   - platform: rpi_gpio

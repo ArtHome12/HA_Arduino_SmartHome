@@ -27,15 +27,15 @@ CONF_NAME_HUMI = 'name_humidity'
 
 DEPENDENCIES = ['multiHTU21D']
 
-SENSORS_SCHEMA = vol.Schema({
-   vol.Required(CONF_NAME_TEMP): cv.string,
-   vol.Required(CONF_NAME_HUMI): cv.string
-})
+# SENSORS_SCHEMA = vol.Schema({
+#    vol.Required(CONF_NAME_TEMP): cv.string,
+#    vol.Required(CONF_NAME_HUMI): cv.string
+# })
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-   vol.Required(CONF_SENSORS):
-       vol.Schema({cv.positive_int: SENSORS_SCHEMA}),
-})
+# PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
+#    vol.Required(CONF_SENSORS):
+#        vol.Schema({cv.positive_int: SENSORS_SCHEMA}),
+# })
 
 
 async def async_setup_platform(hass, config, async_add_entities,
@@ -46,12 +46,16 @@ async def async_setup_platform(hass, config, async_add_entities,
             "A connection has not been made to the multiHTU21D board")
         return False
 
-    sensorsConf = config.get(CONF_SENSORS)
+    # sensorsConf = config.get(CONF_SENSORS)
 
     sensors = []
-    for sensNum, sens in sensorsConf.items():
-        sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_TEMP), sensNum, DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS))
-        sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_HUMI), sensNum, DEVICE_CLASS_HUMIDITY, '%'))
+    # for sensNum, sens in sensorsConf.items():
+    #     sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_TEMP), sensNum, DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS))
+    #     sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_HUMI), sensNum, DEVICE_CLASS_HUMIDITY, '%'))
+    for i in range(8):
+        sensNum = str(i + 1)
+        sensors.append(multiHTU21DSensor('Temperature_' + sensNum, i, DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS))
+        sensors.append(multiHTU21DSensor('Humidity_' + sensNum, i, DEVICE_CLASS_HUMIDITY, '%'))
 
     sensors.append(multiHTU21DSensorExt("Voltage", "Voltage", "V"))
     sensors.append(multiHTU21DSensorExt("Power", "Power", "W"))
@@ -61,8 +65,7 @@ async def async_setup_platform(hass, config, async_add_entities,
 class multiHTU21DSensor(Entity):
     """Representation of an Arduino Sensor."""
 
-    def __init__(self, name, sensorNumber, device_class,
-                 unit_of_measurement):
+    def __init__(self, name, sensorNumber, device_class, unit_of_measurement):
         """Initialize the sensor."""
         self._name = name
         self._state = None
@@ -86,6 +89,11 @@ class multiHTU21DSensor(Entity):
         return self._name
 
     @property
+    def unique_id(self):
+        """Return the name of the sensor."""
+        return self._name
+
+    @property
     def unit_of_measurement(self):
         """Return the unit this state is expressed in."""
         return self._unit_of_measurement
@@ -93,11 +101,10 @@ class multiHTU21DSensor(Entity):
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self._state
+        return None if self._state is None else round(self._state, 2)
 
     async def async_update(self):
         """Get the latest data and updates the states. Update only once for 16 sensors. """
-        #await multiHTU21D.BOARD.update()
         await self.hass.async_add_job(multiHTU21D.BOARD.update)
 
         #_LOGGER.error("update() = %s", self._value)
@@ -107,10 +114,8 @@ class multiHTU21DSensor(Entity):
 class multiHTU21DSensorExt(multiHTU21DSensor):
     """Representation of an Arduino Sensor - extension for voltage and power."""
 
-    def __init__(self, name, device_class,
-                 unit_of_measurement):
-        super().__init__(name, 0, device_class,
-                 unit_of_measurement)
+    def __init__(self, name, device_class, unit_of_measurement):
+        super().__init__(name, 0, device_class, unit_of_measurement)
 
     async def async_update(self):
         #_LOGGER.error("update() = %s", self._value)
