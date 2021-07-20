@@ -25,7 +25,8 @@ uint8_t activeHTU = 0;                  // Индекс активного в т
 
 unsigned long previousMillis = 0;       // Момент последнего обновления, мс.
 const long minDelay = 100;              // Минимально необходимый интервал для работы внутри loop(), мс.
-const unsigned long maxWorkTime = 86400000UL;  // Максимально допустимое время непрерывной работы, мс.
+const unsigned long maxWorkTime = 60000UL * 5UL;  // Максимально допустимое время непрерывной работы, мс.
+// const unsigned long maxWorkTime = 60000UL * 60UL * 24UL;  // Максимально допустимое время непрерывной работы, мс.
 unsigned long maxWorkTimeCurLimit = maxWorkTime;  // Текущая цель, после которой нужна очередная перезагрузка RPi.
 int delaysCount = 0;                    // Количество прошедших минимальных интервалов.
 const int delaysCountLimit = 10;        // Максимальное количество интервалов, при котором срабатывает логика - 100*10=1000мс или один раз в секунду.
@@ -47,7 +48,8 @@ const unsigned int resultsLen = sizeof(float) * 2 * (HTUCount + 1);
 #define INT16_MAX 0x7fffL
 #endif
 
-const int mVoltageLoBound = 11100;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+const int mVoltageLoBound = 11400;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
+// const int mVoltageLoBound = 11100;      // При падении напряжения в милливольтах ниже этой границы RPi надо отключить.
 const int mVoltageHiBound = 11800;      // При росте напряжения в милливольтах выше этой границы RPi надо включить, если она была выключена.
 const int mWattLoBound = 1500;          // Если энергопотребление упало ниже этой границы, считаем что RPi завершила работу и перешла в idle.
 
@@ -67,288 +69,302 @@ const byte eepromPowerOffMode = 2;      // Режим до сброса - RPi в
 
 void setup()
 {
-  // По рекомендации неиспользуемые пины лучше подтянуть к земле, иначе будут потери электроэнергии при спонтанных переключениях от наводок.
-  // У нас только у кнопки требуется отдельное состояние.
-  for (int i = 0; i < NUM_DIGITAL_PINS; i++) {
-    if (i == buttonPin)
-      pinMode(i, INPUT_PULLUP);
-    else
-      pinMode(i, OUTPUT);
-  }
+   // По рекомендации неиспользуемые пины лучше подтянуть к земле, иначе будут потери электроэнергии при спонтанных переключениях от наводок.
+   // У нас только у кнопки требуется отдельное состояние.
+   for (int i = 0; i < NUM_DIGITAL_PINS; i++) {
+      if (i == buttonPin)
+         pinMode(i, INPUT_PULLUP);
+      else
+         pinMode(i, OUTPUT);
+   }
 
-  // Иногда arduino сбрасываетсяпри завершении работы RPi, иногда нет.
-  // Восстановим из EEPROM информацию о состоянии до сброса.
-  // RPi могла быть в режиме завершения работы и уже выключенной.
-  switch (EEPROM.read(eepromAddrShutdown)) {
-    case eepromSendShutdownMode:  powerOffTimer = 1; break;
-    case eepromPowerOffMode:      powerOffTimer = 1; RPiTurnedOff = true; powerOff(); cyclesVoltageHigh = cyclesVoltageHighLimit - 1; break;
-  }
-  
+   // Иногда arduino сбрасываетсяпри завершении работы RPi, иногда нет.
+   // Восстановим из EEPROM информацию о состоянии до сброса.
+   // RPi могла быть в режиме завершения работы и уже выключенной.
+   switch (EEPROM.read(eepromAddrShutdown)) {
+      case eepromSendShutdownMode:
+         powerOffTimer = 1;
+         blinkCountdown = 4;
+         break;
+      case eepromPowerOffMode: 
+         powerOffTimer = 1;
+         RPiTurnedOff = true;
+         powerOff();
+         cyclesVoltageHigh = cyclesVoltageHighLimit - 1;
+         blinkCountdown = 6;
+         break;
+      default:
+         // Индикация начала работы - мигнём 2 раза.
+         blinkCountdown = 2;
+   }
 
-  Wire.begin();
+   Wire.begin();
 
-  voltCurrMeter.setWire(&Wire);
-  voltCurrMeter.begin();
+   voltCurrMeter.setWire(&Wire);
+   voltCurrMeter.begin();
 
-  // Посылаем команду на инициализацию устройств на всех портах.
-  for (activeHTU = 0; activeHTU < HTUCount; activeHTU++) {
-    tcaselect(activeHTU);
-    myHTU21D.begin();
+   // Посылаем команду на инициализацию устройств на всех портах.
+   for (activeHTU = 0; activeHTU < HTUCount; activeHTU++) {
+      tcaselect(activeHTU);
+      myHTU21D.begin();
 
-    // Заполним недействительными значениями во-избежание их появления у пользователя.
-    results[0][activeHTU] = 255;
-    results[1][activeHTU] = 255;
-  }
-  activeHTU = 0;
+      // Заполним недействительными значениями во-избежание их появления у пользователя.
+      results[0][activeHTU] = 255;
+      results[1][activeHTU] = 255;
+   }
+   activeHTU = 0;
 
-  // Напряжение и ток.
-  results[0][HTUCount] = 255;
-  results[1][HTUCount] = 255;
+   // Напряжение и ток.
+   results[0][HTUCount] = 255;
+   results[1][HTUCount] = 255;
 
-  Serial.begin(115200);
+   Serial.begin(115200);
 
-  // Индикация начала работы - мигнём 3 раза.
-  blinkCountdown = 3;
-
-  // Чтобы дать время на опрос датчиков.
-  previousMillis = millis();
+   // Чтобы дать время на опрос датчиков.
+   previousMillis = millis();
 }
 
 
 
 void loop() 
 {
-	// Текущее время.
-	unsigned long currentMillis = millis();
+   // Текущее время.
+   unsigned long currentMillis = millis();
 
-	// Условия вычисляем отдельно, для защиты от перехода через 0.
-	unsigned long condition = currentMillis - previousMillis;
+   // Условия вычисляем отдельно, для защиты от перехода через 0.
+   unsigned long condition = currentMillis - previousMillis;
 
-  // Если слишком мало времени прошло с предыдущего раза.
-  if (condition < minDelay)
-    return;
+   // Если слишком мало времени прошло с предыдущего раза.
+   if (condition < minDelay)
+      return;
 
-  // Сохраним время срабатывания.
-  previousMillis = currentMillis;
+   // Сохраним время срабатывания.
+   previousMillis = currentMillis;
 
 
-  // Обработка логики мигания светодиодом. Если он горел, его надо погасить в этот раз.
-  //
-  if (lightIsOn) {
-    lightIsOn = false;
-    digitalWrite(LED_BUILTIN, LOW);
-  } else {
-    // Если ещё осталось количество миганий
-    if (blinkCountdown > 0) {
-      // Включаем светодиод и уменьшаем счётчик миганий.
-      lightIsOn = true;
-      digitalWrite(LED_BUILTIN, HIGH);
-      blinkCountdown--;
-    }
-  }
+   // Обработка логики мигания светодиодом. Если он горел, его надо погасить в этот раз.
+   //
+   if (lightIsOn) {
+      lightIsOn = false;
+      digitalWrite(LED_BUILTIN, LOW);
+   } else {
+      // Если ещё осталось количество миганий
+      if (blinkCountdown > 0) {
+         // Включаем светодиод и уменьшаем счётчик миганий.
+         lightIsOn = true;
+         digitalWrite(LED_BUILTIN, HIGH);
+         blinkCountdown--;
+      }
+   }
 
-  // Основная логика.
-  //
-	if (++delaysCount >= delaysCountLimit) {
-    // Начинаем заново отсчитывать количество маленьких циклов до захода сюда.
-    delaysCount = 0;
+   // Основная логика.
+   //
+	 if (++delaysCount >= delaysCountLimit) {
+      // Начинаем заново отсчитывать количество маленьких циклов до захода сюда.
+      delaysCount = 0;
 
-    // Считываем данные с мультиплексора. Выбираем порт
-    tcaselect(activeHTU);
-  
-    // Считываем температуру (+-0.3C) и влажность (+-2%).
-    float temp = myHTU21D.readTemperature();
-    results[0][activeHTU] = temp;
-    results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
+      // Считываем данные с мультиплексора. Выбираем порт
+      tcaselect(activeHTU);
 
-    // ОТЛАДКА, ВРЕМЕННО!
-    if (activeHTU == 1) {
-      results[1][activeHTU] = previousMillis / 1000;
-      results[0][activeHTU] = maxWorkTime / 1000;
-    }
+      // Считываем температуру (+-0.3C) и влажность (+-2%).
+      float temp = myHTU21D.readTemperature();
+      results[0][activeHTU] = temp;
+      results[1][activeHTU] = myHTU21D.readCompensatedHumidity(temp);
 
-		// Меняем порт на мультиплексоре.
-    if (++activeHTU >= HTUCount)
-      activeHTU = 0;
+      // ОТЛАДКА, ВРЕМЕННО!
+      if (activeHTU == 1) {
+         results[1][activeHTU] = previousMillis / 60000;
+         results[0][activeHTU] = maxWorkTime / 60000;
+      }
 
-    // Значение напряжения mV и мощности mW
-    int16_t mv, mw;
-    if (voltCurrMeter.readMV(&mv) == 0) 
-      results[0][HTUCount] = mv / 1000.0;
-    else {
-      results[0][HTUCount] = 255;
-      mv = INT16_MAX;
-    }
+      // Меняем порт на мультиплексоре.
+      if (++activeHTU >= HTUCount)
+         activeHTU = 0;
 
-    if (voltCurrMeter.readMW(&mw) == 0)
-      results[1][HTUCount] = mw / 1000.0;
-    else {
-      results[1][HTUCount] = 255;
-      mw = INT16_MAX;
-    }
+      // Значение напряжения mV и мощности mW
+      int16_t mv, mw;
+      if (voltCurrMeter.readMV(&mv) == 0) 
+         results[0][HTUCount] = mv / 1000.0;
+      else {
+        results[0][HTUCount] = 255;
+        mv = INT16_MAX;
+      }
 
-		// Управляем питанием RPi. 
-		powerControl(mv, mw);
+      if (voltCurrMeter.readMW(&mw) == 0)
+         results[1][HTUCount] = mw / 1000.0;
+      else {
+         results[1][HTUCount] = 255;
+         mw = INT16_MAX;
+      }
 
-    // Если не в режиме выключения, то есть в обычном режиме, мигнём один раз.
-    if (powerOffTimer == 0)
-      // Мигнём один раз.
-      blinkCountdown++;
-	}
+      // Управляем питанием RPi. 
+      powerControl(mv, mw);
+
+      // Если не в режиме выключения, то есть в обычном режиме, мигнём один раз.
+      if (powerOffTimer == 0 && blinkCountdown == 0)
+         blinkCountdown++;
+   }
 }
 
 
 // Входящая информация от RPi.
 void serialEvent() {
-  while (Serial.available()) {
-    // get the new byte:
-    char inChar = (char)Serial.read();
+   while (Serial.available()) {
+      // get the new byte:
+      char inChar = (char)Serial.read();
 
-    // Если команда верная, отправляем значения.
-    switch(inChar) {
-      case 'D': Serial.write((uint8_t*)results, resultsLen); break; // Data
-      case 'C': setHeater(HTU21D_ON); break;                        // Check heater
-      case 'E': setHeater(HTU21D_OFF); break;                       // End check heater
-      case 'S': digitalWrite(fanPin, HIGH); break;                  // Start fan
-      case 'F': digitalWrite(fanPin, LOW); break;                   // Stop fan
-    }
-  }
+      // Если команда верная, отправляем значения.
+      switch(inChar) {
+         case 'D': Serial.write((uint8_t*)results, resultsLen); break; // Data
+         case 'C': setHeater(HTU21D_ON); break;                        // Check heater
+         case 'E': setHeater(HTU21D_OFF); break;                       // End check heater
+         case 'S': digitalWrite(fanPin, HIGH); break;                  // Start fan
+         case 'F': digitalWrite(fanPin, LOW); break;                   // Stop fan
+      }
+   }
 }
 
 
 // Управление мультиплексором TCA9548A - выбор активного устройства.
 void tcaselect(uint8_t i) {
-  Wire.beginTransmission(TCAADDR);
-  Wire.write(1 << i);
-  Wire.endTransmission();  
+   Wire.beginTransmission(TCAADDR);
+   Wire.write(1 << i);
+   Wire.endTransmission();  
 }
 
 // Включение подогрева на всех присоединённых датчиках HTU21D.
 void setHeater(HTU21D_HEATER_SWITCH heaterSwitch) {
-    for (uint8_t t = 0; t < HTUCount; t++) {
+   for (uint8_t t = 0; t < HTUCount; t++) {
       tcaselect(t);
       myHTU21D.setHeater(heaterSwitch);
-    }
+   }
 }
 
 
 // Отправляет сигнал ОС RPi о необходимости завершить работу.
 void sendShutdown() {
-  // Сообщаем RPi о необходимости завершить работу.
-  digitalWrite(RPiSendShutdownPin, HIGH);  
+   // Сообщаем RPi о необходимости завершить работу.
+   digitalWrite(RPiSendShutdownPin, HIGH);  
 
-  // Если RPi уже выключена, больше ничего делать не надо. Ставим не в начало функции, так как могут быть ситуации,
-  // когда RPi не выключена, а RPiTurnedOff уже истина из-за сбросов ардуины.
-  if (RPiTurnedOff)
-    return;
-  
-  // Если это включение таймера (первое увеличение), запишем информацию в EEPROM на случай сброса ардуины при завершении работы RPi.
-  if (!powerOffTimer)
-    EEPROM.write(eepromAddrShutdown, eepromSendShutdownMode);
+   // Если RPi уже выключена, больше ничего делать не надо. Ставим не в начало функции, так как могут быть ситуации,
+   // когда RPi не выключена, а RPiTurnedOff уже истина из-за сбросов ардуины.
+   if (RPiTurnedOff)
+      return;
+   
+   // Если это включение таймера (первое увеличение), запишем информацию в EEPROM на случай сброса ардуины при завершении работы RPi.
+   if (!powerOffTimer)
+      EEPROM.write(eepromAddrShutdown, eepromSendShutdownMode);
 
-  // Включаем либо увеличиваем таймер отключения питания.
-  powerOffTimer++;
+   // Включаем либо увеличиваем таймер отключения питания.
+   powerOffTimer++;
 
-  // Включаем светодиод для индикации, что RPi завершает работу.
-  digitalWrite(LED_BUILTIN, HIGH);
+   // Включаем светодиод для индикации, что RPi завершает работу.
+   digitalWrite(LED_BUILTIN, HIGH);
 }
 
 
 // Отключаем питание RPi.
 void powerOff() {
 
-  // Если это первый вызов выключения, запишем информацию в энергонезависимую память.
-  if (!RPiTurnedOff) {
-    EEPROM.write(eepromAddrShutdown, eepromPowerOffMode);
-  
-    // Флаг, что питание снято.
-    RPiTurnedOff = true;
-  }
-    
-  // Гасим RPi.
-  digitalWrite(RPiPowerOffPin, HIGH);
+   // Если это первый вызов выключения, запишем информацию в энергонезависимую память.
+   if (!RPiTurnedOff) {
+      EEPROM.write(eepromAddrShutdown, eepromPowerOffMode);
 
-  // Снимаем сигнал завершения работы для экономии электроэнергии (иногда зажигается сведодиод, если RPi обесточена, а этот сигнал есть).
-  digitalWrite(RPiSendShutdownPin, LOW);
+      // Флаг, что питание снято.
+      RPiTurnedOff = true;
+   }
 
-  // Погасим светодиод.
-  digitalWrite(LED_BUILTIN, LOW);
+   // Гасим RPi.
+   digitalWrite(RPiPowerOffPin, HIGH);
+
+   // Снимаем сигнал завершения работы для экономии электроэнергии (иногда зажигается сведодиод, если RPi обесточена, а этот сигнал есть).
+   digitalWrite(RPiSendShutdownPin, LOW);
+
+   // Погасим светодиод.
+   digitalWrite(LED_BUILTIN, LOW);
 }
 
 // Управляет питанием RPi.
 void powerControl(int voltage, int power){
-  // 1. Проверяем, не упало ли энергопотребление RPi.
-  if (power < mWattLoBound) {
-    // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
-    if (cyclesPowerLow++ > cyclesPowerLowLimit)
-      powerOff();
-  } else
-    // Энергопотребление выше минимального, сбрасываем счётчик.
-    cyclesPowerLow = 0;
+   // 1. Проверяем, не упало ли энергопотребление RPi.
+   if (power < mWattLoBound) {
+      // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
+      if (cyclesPowerLow++ > cyclesPowerLowLimit)
+         powerOff();
+         delay(1000);
+   } else {
+      // Энергопотребление выше минимального, сбрасываем счётчик.
+      cyclesPowerLow = 0;
+   }
 
-  // 2. Проверяем, не сработал ли таймер отключения.
-  if (powerOffTimer > powerOffTimerLimit)
+   // 2. Проверяем, не сработал ли таймер отключения.
+   /* if (powerOffTimer > powerOffTimerLimit) {
       powerOff();
+   }
 
-  // 3. Проверяем не упало ли напряжение источника питания.
-  if (voltage < mVoltageLoBound) {
-    // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на завершение работы.
-    if (cyclesVoltageLow++ > cyclesVoltageLowLimit)
+   // 3. Проверяем не упало ли напряжение источника питания.
+   if (voltage < mVoltageLoBound) {
+      // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на завершение работы.
+      if (cyclesVoltageLow++ > cyclesVoltageLowLimit)
+         sendShutdown();
+   } else
+      // Энергопотребление выше минимального, сбрасываем счётчик.
+      cyclesVoltageLow = 0;
+
+   // 4. Проверяем, не отжата ли кнопка.
+   if (digitalRead(buttonPin) == HIGH) {
+      // Посылаем сигнал завершения работы малины, если ещё не сделано.
       sendShutdown();
-  } else
-    // Энергопотребление выше минимального, сбрасываем счётчик.
-    cyclesVoltageLow = 0;
 
-  // 4. Проверяем, не отжата ли кнопка.
-  if (digitalRead(buttonPin) == HIGH) {
-    // Посылаем сигнал завершения работы малины, если ещё не сделано.
-    sendShutdown();
+      // Выходим, иначе проверка на достаточное напряжение аннулирует выключение.
+      return;
+   } */
 
-    // Выходим, иначе проверка на достаточное напряжение аннулирует выключение.
-    return;
-  }
-  
-  // 5. Проверяем на предельное время работы без перезагрузки.
-  /*if (previousMillis > maxWorkTimeCurLimit) {
-    // Посылаем сигнал завершения работы малины, если ещё не сделано.
-    sendShutdown();
+   // 5. Проверяем на предельное время работы без перезагрузки.
+   if (previousMillis > maxWorkTimeCurLimit) {
+      // Посылаем сигнал завершения работы малины, если ещё не сделано.
+      sendShutdown();
 
-    // Увеличиваем лимит. На случай, если перезагрузка не произодёт при выключении/включении RPi.
-    maxWorkTimeCurLimit += maxWorkTime;
+      // Увеличиваем лимит. На случай, если перезагрузка не произодёт при выключении/включении RPi.
+      maxWorkTimeCurLimit += maxWorkTime;
 
-    // Выходим, иначе проверка на достаточное напряжение аннулирует выключение.
-    return;
-  }*/
-  
-  
+      // Выходим, иначе проверка на достаточное напряжение аннулирует выключение.
+      return;
+   }
 
   // 6. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
   // Проверка на отключенность необязательна для логики, оставляем для быстродействия.
   if (voltage > mVoltageHiBound && powerOffTimer > 0) {
-    // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на включение.
-    if (cyclesVoltageHigh++ > cyclesVoltageHighLimit) {
-      // Отменяем таймер принудительного отключения.
-      powerOffTimer = 0;
 
-      // Флаг, что питание подано.
-      RPiTurnedOff = false;
+      // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на включение.
+      if (cyclesVoltageHigh++ > cyclesVoltageHighLimit) {
 
-      // Заново запускаем счётчик низкого энергопотребления с форой на холостой цикл и раскачку.
-      cyclesPowerLow = -2;
+         // Отменяем таймер принудительного отключения.
+         powerOffTimer = 0;
 
-      // Снимаем сигнал о необходимости завершения работы.
-      digitalWrite(RPiSendShutdownPin, LOW);    
-      
-      // Подаём питание на RPi.
-      digitalWrite(RPiPowerOffPin, LOW);
-      
-      // Мигнём 5 раз (и шестой раз добавится в коде ниже).
-      blinkCountdown += 5;
+         // Флаг, что питание подано.
+         RPiTurnedOff = false;
 
-      // Снимем в энергонезависимой памяти все флаги.
-      EEPROM.write(eepromAddrShutdown, 0);
-    }
-  } else
-    // Напряжение недостаточно высокое, сбросим счётчик.
-    cyclesVoltageHigh = 0;  
+         // Заново запускаем счётчик низкого энергопотребления с форой на холостой цикл и раскачку.
+         cyclesPowerLow = -3;
+
+         // Снимаем сигнал о необходимости завершения работы.
+         digitalWrite(RPiSendShutdownPin, LOW);
+
+         // Подаём питание на RPi.
+         digitalWrite(RPiPowerOffPin, LOW);
+
+         // Ждём, чтобы RPi успела обесточится.
+         delay(15000);
+
+         // Мигнём для индикации режима.
+         blinkCountdown = 9;
+
+         // Снимем в энергонезависимой памяти все флаги.
+         EEPROM.write(eepromAddrShutdown, 0);
+      }
+   } else {
+      // Напряжение недостаточно высокое, сбросим счётчик.
+      cyclesVoltageHigh = 0;
+   }
 }
