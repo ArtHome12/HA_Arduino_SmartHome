@@ -134,7 +134,6 @@ void setup()
 }
 
 
-
 void loop() 
 {
    // Текущее время.
@@ -250,13 +249,12 @@ void setHeater(HTU21D_HEATER_SWITCH heaterSwitch) {
 }
 
 
-// Отправляет сигнал ОС RPi о необходимости завершить работу.
+// Sends a signal to the RPi OS to shutdown.
 void sendShutdown() {
-   // Сообщаем RPi о необходимости завершить работу.
+
    digitalWrite(RPiSendShutdownPin, HIGH);  
 
-   // Если RPi уже выключена, больше ничего делать не надо. Ставим не в начало функции, так как могут быть ситуации,
-   // когда RPi не выключена, а RPiTurnedOff уже истина из-за сбросов ардуины.
+   // If RPi already shutdowned. We can get here when the arduino restarts unexpectedly
    if (RPiTurnedOff)
       return;
    
@@ -275,11 +273,9 @@ void sendShutdown() {
 // Отключаем питание RPi.
 void powerOff() {
 
-   // Если это первый вызов выключения, запишем информацию в энергонезависимую память.
+   // Если ещё не была выключена, запишем информацию в энергонезависимую память.
    if (!RPiTurnedOff) {
       EEPROM.write(eepromAddrShutdown, eepromPowerOffMode);
-
-      // Флаг, что питание снято.
       RPiTurnedOff = true;
    }
 
@@ -291,28 +287,31 @@ void powerOff() {
 
    // Погасим светодиод.
    digitalWrite(LED_BUILTIN, LOW);
+
+   // Задержка для коммутации.
+   delay(1000);
 }
 
 // Управляет питанием RPi.
-void powerControl(int voltage, int power){
+void powerControl(int voltage, int power) {
+
    // 1. Проверяем, не упало ли энергопотребление RPi.
    if (power < mWattLoBound) {
       // Увеличиваем счётчик и если достаточно отмотали, выключаем RPi.
       if (cyclesPowerLow++ > cyclesPowerLowLimit)
          powerOff();
-         delay(1000);
    } else {
       // Энергопотребление выше минимального, сбрасываем счётчик.
       cyclesPowerLow = 0;
    }
 
-   // 2. Проверяем, не сработал ли таймер отключения.
-   /* if (powerOffTimer > powerOffTimerLimit) {
+   // 2. Принудительное выключение, если PRi продолжает работать несмотря на требование отключения.
+   if (powerOffTimer > powerOffTimerLimit) {
       powerOff();
    }
 
    // 3. Проверяем не упало ли напряжение источника питания.
-   if (voltage < mVoltageLoBound) {
+   /*if (voltage < mVoltageLoBound) {
       // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на завершение работы.
       if (cyclesVoltageLow++ > cyclesVoltageLowLimit)
          sendShutdown();
@@ -341,8 +340,8 @@ void powerControl(int voltage, int power){
       return;
    }
 
-   // 6. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
-   if (voltage > mVoltageHiBound && (powerOffTimer > 0 || RPiTurnedOff)) {
+   // 6. Если напряжение достаточное, а RPi выключена, включаем
+   if (voltage > mVoltageHiBound && RPiTurnedOff) {
 
       // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на включение.
       if (cyclesVoltageHigh++ > cyclesVoltageHighLimit) {
@@ -353,6 +352,9 @@ void powerControl(int voltage, int power){
          // Флаг, что питание подано.
          RPiTurnedOff = false;
 
+         // Снимем в энергонезависимой памяти все флаги.
+         EEPROM.write(eepromAddrShutdown, 0);
+
          // Заново запускаем счётчик низкого энергопотребления с форой на холостой цикл и раскачку.
          cyclesPowerLow = -3;
 
@@ -362,14 +364,11 @@ void powerControl(int voltage, int power){
          // Подаём питание на RPi.
          digitalWrite(RPiPowerOffPin, LOW);
 
-         // Ждём, чтобы RPi успела обесточится.
-         delay(15000);
+         // Задержка для коммутации.
+         delay(1000);
 
          // Мигнём для индикации режима.
          blinkCountdown = 9;
-
-         // Снимем в энергонезависимой памяти все флаги.
-         EEPROM.write(eepromAddrShutdown, 0);
       }
    } else {
       // Напряжение недостаточно высокое, сбросим счётчик.
