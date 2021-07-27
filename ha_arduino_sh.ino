@@ -78,13 +78,22 @@ void setup()
          pinMode(i, OUTPUT);
    }
 
+   // Индикация старта
+   for (int i = 0; i < 2; i++) {
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(500);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(500);
+   }
+   delay(500);
+
    // Иногда arduino сбрасываетсяпри завершении работы RPi, иногда нет.
    // Восстановим из EEPROM информацию о состоянии до сброса.
    // RPi могла быть в режиме завершения работы и уже выключенной.
    switch (EEPROM.read(eepromAddrShutdown)) {
       case eepromSendShutdownMode:
          powerOffTimer = 1;
-         blinkCountdown = 4;
+         blinkCountdown = 3;
          break;
       case eepromPowerOffMode: 
          powerOffTimer = 1;
@@ -93,9 +102,9 @@ void setup()
          cyclesVoltageHigh = cyclesVoltageHighLimit - 1;
          blinkCountdown = 6;
          break;
-      default:
+      // default:
          // Индикация начала работы - мигнём 2 раза.
-         blinkCountdown = 2;
+         // blinkCountdown = 2;
    }
 
    Wire.begin();
@@ -333,8 +342,7 @@ void powerControl(int voltage, int power){
    }
 
    // 6. Проверяем не выросло ли напряжение источника питания в момент, когда ранее была команда на завершение работы.
-   // Проверка на отключенность необязательна для логики, оставляем для быстродействия.
-   if (voltage > mVoltageHiBound && powerOffTimer > 0) {
+   if (voltage > mVoltageHiBound && (powerOffTimer > 0 || RPiTurnedOff)) {
 
       // Увеличиваем счётчик и если достаточно отмотали, отправляем сигнал на включение.
       if (cyclesVoltageHigh++ > cyclesVoltageHighLimit) {
