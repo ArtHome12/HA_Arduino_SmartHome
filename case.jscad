@@ -4,10 +4,10 @@ function mainboard() {
     return union(
         // Сама плата
         cube([80, 60, 1]).translate([0, 0, 5]),
-        
+
         //Место снизу платы
         cube([74, 54, 5]).translate([3, 3, 0]),
-        
+
         // Место сверху и углубление в корпус с левой стороны
         cube([79, 60, 24]).translate([1, 0, 6])
     );
@@ -17,7 +17,7 @@ function space_after_mainboard() {
     return union(
         // Пластинка на 1 мм выше платы даст корпус заподлицо с платой
         cube([5, 60, 24]),
-        
+
         // Стенка между step_down
         cube([63, 5, 24]).translate([5, 28, 0])
     );
@@ -27,10 +27,10 @@ function step_down_5v() {
     return union(
         // Сама плата плюс место сверху
         cube([63, 27, 1+24]).translate([0, 0, 5]),
-        
+
         // Место снизу платы в левой части
         cube([20, 27, 5]),
-        
+
         // Место снизу платы в правой части
         cube([15, 27, 5]).translate([63-15, 0, 0])
     );
@@ -77,13 +77,13 @@ function main() {
         wire_window().translate([20, 62, 10])
         ,roof_step().translate([1.5, 1.5, 33]).setColor([0, 0, 50])
     );
-    
+
     // Нижняя часть корпуса
     const bottom_box = difference(cube([85+63+6, 63+3, 3+30+1.5]), inner_part);
-    
+
     // Верхняя часть корпуса
     const top_box = difference(cube([85+63+6, 63+3, 3]).translate([0, 0, 3+30]), bottom_box);
-    
+
     //return inner_part;
     //return bottom_box;
     return union(bottom_box, top_box.translate([0, 0, 30]));
