@@ -74,6 +74,8 @@ class ArduinoBoard:
         self._humidities = None
         self._voltage = None
         self._power = None
+        self._worktime = None
+        self._worklimit = None
 
         # Open and update sensor values.
         self.update()
@@ -94,9 +96,9 @@ class ArduinoBoard:
             self._ser.reset_input_buffer()
             self._ser.write(b'D')
 
-            # Read 8 float values of temperature and 1 voltage.
-            rawData = self._ser.read(4 * 9)
-            if len(rawData) != 4 * 9:
+            # Read 8 float values of temperature and 1 voltage and 1 work time.
+            rawData = self._ser.read(4 * 10)
+            if len(rawData) != 4 * 10:
                 _LOGGER.warning("Error receive data from HTU21D, actually read %s bytes", len(rawData))
                 return
             rawArray = array.array('f')
@@ -109,11 +111,13 @@ class ArduinoBoard:
 
             # Plus voltage
             self._voltage = rawArray[8] if rawArray[8] < 255.0 else math.nan
-            
+
+            # Plus time
+            self._worktime = rawArray[9] if rawArray[9] < 255.0 else math.nan
 
             # Read humidity and power
-            rawData = self._ser.read(4 * 9)
-            if len(rawData) != 4 * 9:
+            rawData = self._ser.read(4 * 10)
+            if len(rawData) != 4 * 10:
                 _LOGGER.warning("Error receive data from HTU21D, actually read %s bytes", len(rawData))
                 return
             rawArray = array.array('f')
@@ -126,6 +130,9 @@ class ArduinoBoard:
 
             # Plus power
             self._power = rawArray[8] if rawArray[8] < 255.0 else math.nan
+
+            # Plus time
+            self._worklimit = rawArray[9] if rawArray[9] < 255.0 else math.nan
 
         #except IOError:
         except:
@@ -202,5 +209,13 @@ class ArduinoBoard:
     def get_power(self):
         """Return the input power."""
         return self._power
+
+    def get_worktime(self):
+        """Return work time of arduino."""
+        return self._worktime
+
+    def get_worklimit(self):
+        """Return work time limit of arduino."""
+        return self._worklimit
 
 

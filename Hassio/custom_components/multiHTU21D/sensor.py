@@ -27,16 +27,6 @@ CONF_NAME_HUMI = 'name_humidity'
 
 DEPENDENCIES = ['multiHTU21D']
 
-# SENSORS_SCHEMA = vol.Schema({
-#    vol.Required(CONF_NAME_TEMP): cv.string,
-#    vol.Required(CONF_NAME_HUMI): cv.string
-# })
-
-# PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-#    vol.Required(CONF_SENSORS):
-#        vol.Schema({cv.positive_int: SENSORS_SCHEMA}),
-# })
-
 
 async def async_setup_platform(hass, config, async_add_entities,
                                discovery_info=None):
@@ -49,9 +39,6 @@ async def async_setup_platform(hass, config, async_add_entities,
     # sensorsConf = config.get(CONF_SENSORS)
 
     sensors = []
-    # for sensNum, sens in sensorsConf.items():
-    #     sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_TEMP), sensNum, DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS))
-    #     sensors.append(multiHTU21DSensor(sens.get(CONF_NAME_HUMI), sensNum, DEVICE_CLASS_HUMIDITY, '%'))
     for i in range(8):
         sensNum = str(i + 1)
         sensors.append(multiHTU21DSensor('Temperature_' + sensNum, i, DEVICE_CLASS_TEMPERATURE, TEMP_CELSIUS))
@@ -59,6 +46,9 @@ async def async_setup_platform(hass, config, async_add_entities,
 
     sensors.append(multiHTU21DSensorExt("Voltage", "Voltage", "V"))
     sensors.append(multiHTU21DSensorExt("Power", "Power", "W"))
+
+    sensors.append(multiHTU21DSensorExt2("Work_time", "Work_time", "H"))
+    sensors.append(multiHTU21DSensorExt2("Work_limit", "Work_limit", "H"))
     async_add_entities(sensors)
 
 
@@ -120,3 +110,18 @@ class multiHTU21DSensorExt(multiHTU21DSensor):
     async def async_update(self):
         #_LOGGER.error("update() = %s", self._value)
         self._state = multiHTU21D.BOARD.get_voltage() if self._device_class == "Voltage" else multiHTU21D.BOARD.get_power()
+
+class multiHTU21DSensorExt2(multiHTU21DSensor):
+    """Representation of an Arduino Sensor - extension for work time of arduino."""
+
+    def __init__(self, name, device_class, unit_of_measurement):
+        super().__init__(name, 0, device_class, unit_of_measurement)
+
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        return None if self._state is None else round(self._state)
+
+    async def async_update(self):
+        #_LOGGER.error("update() = %s", self._value)
+        self._state = multiHTU21D.BOARD.get_worktime() if self._device_class == "Work_time" else multiHTU21D.BOARD.get_worklimit()
