@@ -62,7 +62,7 @@ class multiHTU21DSensor(Entity):
         self._device_class = device_class
         self._unit_of_measurement = unit_of_measurement
         self._sensorNumber = sensorNumber
-        #self.async_update()
+        multiHTU21D.BOARD.update
 
     @property
     def should_poll(self):

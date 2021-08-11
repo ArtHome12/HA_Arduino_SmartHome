@@ -78,7 +78,7 @@ class ArduinoBoard:
         self._worklimit = None
 
         # Open and update sensor values.
-        self.update()
+        self.update() #в логе предупреждение о медленном старте и потом ошибка чтения всё равно
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
@@ -155,7 +155,7 @@ class ArduinoBoard:
             self._ser = serial.Serial(port=self._port, baudrate=115200, timeout=3)
 
             # Wait for port to get ready
-            time.sleep(3)
+            # time.sleep(8)
 
             # Success
             return True
@@ -196,11 +196,11 @@ class ArduinoBoard:
 
     def get_temperature(self, index):
         """Return the temperature of the sensor with index."""
-        return None if self._temperatures is None else self._temperatures[index - 1]
+        return None if self._temperatures is None else self._temperatures[index]
 
     def get_humidity(self, index):
         """Return the humidity of the sensor with index."""
-        return None if self._humidities is None else self._humidities[index - 1]
+        return None if self._humidities is None else self._humidities[index]
  
     def get_voltage(self):
         """Return the input voltage."""
